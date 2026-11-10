@@ -101,6 +101,19 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
 .ab{font-size:12.5px;padding:6px 12px;border:1px solid var(--bstrong);background:transparent;color:var(--text);cursor:pointer;font-family:inherit}
 .ab.ap{border-color:var(--accent);color:var(--accent)}
 .ab:hover{border-color:var(--text)}
+.wrbtn{width:auto;padding:10px 16px;margin-top:4px}
+.doclist{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.doclink{font-size:12.5px;color:var(--accent);cursor:pointer;font-family:'JetBrains Mono',monospace}
+.doclink:hover{text-decoration:underline}
+.wrdoc{margin-top:16px;background:var(--surface);border:1px solid var(--border);padding:18px 20px;font-size:14px;line-height:1.6}
+.wrdoc h1{font-size:22px;letter-spacing:-.01em;margin:0 0 10px}
+.wrdoc h2{font-size:16px;margin:20px 0 8px;color:var(--accent);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em}
+.wrdoc h3{font-size:14px;margin:14px 0 6px}
+.wrdoc ul,.wrdoc ol{padding-left:20px;margin:8px 0}.wrdoc li{margin:3px 0;color:var(--t2)}
+.wrdoc p{margin:8px 0;color:var(--t2)}.wrdoc strong{color:var(--text)}
+.wrdoc table{border-collapse:collapse;width:100%;font-size:12.5px;margin:10px 0}
+.wrdoc th,.wrdoc td{border:1px solid var(--border);padding:5px 8px;text-align:left}
+.wrdoc th{color:var(--t2)}
 </style>
 </head>
 <body>
@@ -122,6 +135,7 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
 <div id="ov" class="ov" onclick="if(event.target===this)closeDetail()"><div class="ovbox" id="ovbox"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 <script>
 var SUPA_URL="https://yoimpltmxtmbhlfgjzoo.supabase.co";
 var SUPA_KEY="sb_publishable_O3hpZ8Umfo7T67S90_mp5A_Sq9Ueth5";
@@ -298,10 +312,11 @@ async function openDetail(id){
   var F=await sb.from("v_funil_etapa").select("*").eq("projeto_id",id);
   var C=await sb.from("v_coorte").select("*").eq("projeto_id",id);
   var G=await sb.from("v_ganhos").select("*").eq("projeto_id",id);
-  renderDetail(p,F.data||[],C.data||[],G.data||[]);
+  var D=await sb.from("documentos").select("id,titulo,criado_em").eq("projeto_id",id).order("criado_em",{ascending:false});
+  renderDetail(p,F.data||[],C.data||[],G.data||[],D.data||[]);
 }
 function closeDetail(){el("ov").style.display="none";}
-function renderDetail(p,funil,coorte,ganhos){
+function renderDetail(p,funil,coorte,ganhos,docs){
   var h='<div class="ovh"><span style="font-weight:700;font-size:20px">'+esc(p.nome)+'</span><span class="x" onclick="closeDetail()">✕</span></div>';
   if(!funil.length){h+='<p class="sub">Sem dado lead-a-lead carregado para este projeto ainda.</p>';el("ovbox").innerHTML=h;return;}
   var totG=ganhos.reduce(function(s,g){return s+(Number(g.valor)||0);},0);
@@ -323,7 +338,27 @@ function renderDetail(p,funil,coorte,ganhos){
   h+='<table class="tbl"><tr><th>mes</th><th>entraram</th><th>ganho(contrato)</th><th>perdido</th><th>aberto</th></tr>';
   coorte.slice(0,8).forEach(function(c){h+='<tr><td>'+c.mes+'</td><td>'+c.entraram+'</td><td>'+c.won+'</td><td>'+c.lost+'</td><td>'+c.aberto+'</td></tr>';});
   h+='</table><p class="src" style="margin-top:14px">Dado lead-a-lead do Pipedrive, atualizado pelo sync a cada 6h.</p>';
+  h+='<div class="sec">War Room — documento</div>';
+  h+='<button class="btn wrbtn" data-slug="'+esc(p.slug)+'" onclick="gerarWarRoom(this)">Gerar documento de War Room (IA · Opus)</button>';
+  if(docs&&docs.length){h+='<div class="doclist">';docs.forEach(function(d){h+='<span class="doclink" data-id="'+d.id+'" onclick="verDoc(this)">'+esc(d.titulo)+'</span>';});h+='</div>';}
+  h+='<div id="wrdoc" class="wrdoc" style="display:none"></div>';
   el("ovbox").innerHTML=h;
+}
+function mostrarDoc(md){var el2=el("wrdoc");el2.style.display="block";el2.innerHTML=(window.marked?marked.parse(md):esc(md));el2.scrollIntoView({behavior:"smooth",block:"start"});}
+async function gerarWarRoom(btn){
+  var slug=btn.dataset.slug;var t0=btn.textContent;btn.disabled=true;btn.textContent="Gerando com Opus… (~30s)";
+  try{
+    var r=await sb.functions.invoke("war-room",{body:{projeto:slug}});
+    var err=(r.data&&r.data.error)||(r.error&&r.error.message);
+    if(err||!r.data||!r.data.documento){el("wrdoc").style.display="block";el("wrdoc").innerHTML='<p class="sub">Não consegui gerar: '+esc(err||"erro desconhecido")+'</p>';}
+    else{mostrarDoc(r.data.documento.conteudo);}
+  }catch(e){el("wrdoc").style.display="block";el("wrdoc").innerHTML='<p class="sub">Falha: '+esc(String(e&&e.message||e))+'</p>';}
+  btn.disabled=false;btn.textContent=t0;
+}
+async function verDoc(span){
+  var id=span.dataset.id;var r=await sb.from("documentos").select("conteudo").eq("id",id).single();
+  if(r.error){mostrarDoc("Erro ao abrir: "+r.error.message);return;}
+  mostrarDoc(r.data.conteudo);
 }
 sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_IN")boot();});
 boot();
