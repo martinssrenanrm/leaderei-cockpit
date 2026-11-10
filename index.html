@@ -338,17 +338,20 @@ function renderDetail(p,funil,coorte,ganhos,docs){
   h+='<table class="tbl"><tr><th>mes</th><th>entraram</th><th>ganho(contrato)</th><th>perdido</th><th>aberto</th></tr>';
   coorte.slice(0,8).forEach(function(c){h+='<tr><td>'+c.mes+'</td><td>'+c.entraram+'</td><td>'+c.won+'</td><td>'+c.lost+'</td><td>'+c.aberto+'</td></tr>';});
   h+='</table><p class="src" style="margin-top:14px">Dado lead-a-lead do Pipedrive, atualizado pelo sync a cada 6h.</p>';
-  h+='<div class="sec">War Room — documento</div>';
-  h+='<button class="btn wrbtn" data-slug="'+esc(p.slug)+'" onclick="gerarWarRoom(this)">Gerar documento de War Room (IA · Opus)</button>';
+  h+='<div class="sec">Documentos de IA</div>';
+  h+='<div class="acao-btns" style="margin-top:0">';
+  h+='<button class="btn wrbtn" data-fn="war-room" data-slug="'+esc(p.slug)+'" onclick="gerarDoc(this)">Gerar War Room (Opus)</button>';
+  h+='<button class="btn wrbtn" style="background:transparent;border:1px solid var(--accent);color:var(--accent)" data-fn="agente-abordagens" data-slug="'+esc(p.slug)+'" onclick="gerarDoc(this)">Gerar Kit de Abordagem (Opus)</button>';
+  h+='</div>';
   if(docs&&docs.length){h+='<div class="doclist">';docs.forEach(function(d){h+='<span class="doclink" data-id="'+d.id+'" onclick="verDoc(this)">'+esc(d.titulo)+'</span>';});h+='</div>';}
   h+='<div id="wrdoc" class="wrdoc" style="display:none"></div>';
   el("ovbox").innerHTML=h;
 }
 function mostrarDoc(md){var el2=el("wrdoc");el2.style.display="block";el2.innerHTML=(window.marked?marked.parse(md):esc(md));el2.scrollIntoView({behavior:"smooth",block:"start"});}
-async function gerarWarRoom(btn){
-  var slug=btn.dataset.slug;var t0=btn.textContent;btn.disabled=true;btn.textContent="Gerando com Opus… (~30s)";
+async function gerarDoc(btn){
+  var slug=btn.dataset.slug;var fn=btn.dataset.fn;var t0=btn.textContent;btn.disabled=true;btn.textContent="Gerando com Opus… (~30s)";
   try{
-    var r=await sb.functions.invoke("war-room",{body:{projeto:slug}});
+    var r=await sb.functions.invoke(fn,{body:{projeto:slug}});
     var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     if(err||!r.data||!r.data.documento){el("wrdoc").style.display="block";el("wrdoc").innerHTML='<p class="sub">Não consegui gerar: '+esc(err||"erro desconhecido")+'</p>';}
     else{mostrarDoc(r.data.documento.conteudo);}
