@@ -85,6 +85,11 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
 .tbl th,.tbl td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;white-space:nowrap}
 .tbl th{color:var(--t2);font-weight:500}
 .tbl td:first-child{white-space:normal}
+.avisos{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border)}
+.aviso{background:var(--surface);padding:11px 14px;font-size:13.5px;border-left:3px solid var(--muted);color:var(--t2)}
+.aviso.u3{border-left-color:var(--alta);color:var(--text)}
+.aviso.u2{border-left-color:var(--media)}
+.aviso.u1{border-left-color:var(--bstrong)}
 </style>
 </head>
 <body>
@@ -97,6 +102,7 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
   <h1>O que precisa da sua atenção hoje</h1>
   <p class="sub">Cada projeto, seu funil, as recomendações em aberto e os riscos — ao vivo, só o que é seu.</p>
   <div class="kpis"><div class="kpi"><div class="n" id="kpiProj">—</div><div class="l">projetos ativos</div></div><div class="kpi"><div class="n accent" id="kpiRecs">—</div><div class="l">recomendações em aberto</div></div><div class="kpi"><div class="n accent" id="kpiRisco">—</div><div class="l" id="kpiRiscoSub">riscos ativos</div></div></div>
+  <div id="avisosWrap"></div>
   <div class="sec">Projetos — ordenados por risco</div>
   <div class="cards" id="cards"></div>
 </div>
@@ -117,6 +123,33 @@ function fmtInt(n){return n==null?"—":Number(n).toLocaleString("pt-BR");}
 function fmtMoney(v){if(v==null)return "—";v=Number(v);if(v>=1e6)return "R$"+(v/1e6).toFixed(2).replace(".",",")+"mi";if(v>=1e3)return "R$"+Math.round(v/1e3)+"k";return "R$"+v;}
 function fmtDM(d){if(!d)return "—";var p=String(d).slice(0,10).split("-");return p[2]+"/"+p[1];}
 function canalNome(c){var m={whatsapp:"WhatsApp",ligacao:"Ligação",email:"E-mail",linkedin:"LinkedIn",evento:"Evento",webinar:"Webinar",inbound:"Inbound",reativacao:"Reativação",misto:"Misto"};return m[c]||c;}
+function nomeP(projetos,id){var p=projetos.filter(function(x){return x.id===id;})[0];return p?p.nome:"";}
+function diasAte(d,today){return Math.round((new Date(d)-new Date(today))/864e5);}
+function buildAvisos(projetos,recsOpen,sinaisA,metricas,ag,today){
+  var A=[];
+  recsOpen.filter(function(r){return r.checar_em;}).forEach(function(r){
+    var dd=diasAte(r.checar_em,today);
+    if(dd<=7){A.push({u:(dd<0||dd<=2)?3:2,t:(dd<0?"Previsão venceu ("+fmtDM(r.checar_em)+")":"Previsão vence em "+dd+"d")+" — "+nomeP(projetos,r.projeto_id)+": "+(r.recomendacao||"").slice(0,80)});}
+  });
+  sinaisA.filter(function(s){return s.severidade==="alta";}).forEach(function(s){
+    A.push({u:3,t:"Risco alto — "+nomeP(projetos,s.projeto_id)+": "+(s.descricao||"").slice(0,100)});
+  });
+  (ag||[]).forEach(function(g){
+    if(g.won>0 && g.won_contrato/g.won>=0.5){A.push({u:2,t:nomeP(projetos,g.projeto_id)+": "+g.won_contrato+" de "+g.won+" ganhos estão em Contrato Enviado (não pago) — ajustar definição de ganho"});}
+    if(g.won_zerado>0){A.push({u:1,t:nomeP(projetos,g.projeto_id)+": "+g.won_zerado+" ganho(s) com valor zerado"});}
+  });
+  projetos.forEach(function(p){
+    var t=metricas.filter(function(m){return m.projeto_id===p.id && m.periodo && m.periodo.indexOf("toques")===0 && m.contatos!=null;});
+    if(t.length){var tot=t.reduce(function(s,m){return s+m.contatos;},0);var em=t.filter(function(m){return m.canal==="email";}).reduce(function(s,m){return s+m.contatos;},0);
+      if(tot>0 && em/tot>0.11){A.push({u:2,t:p.nome+": e-mail passou de 11% das atividades ("+Math.round(em/tot*100)+"%) — canal de baixo retorno"});}
+    }
+  });
+  A.sort(function(a,b){return b.u-a.u;});
+  if(!A.length) return '<div class="sec">Avisos</div><p class="sub">Nada urgente agora.</p>';
+  var h='<div class="sec">Avisos — o que pede ação</div><div class="avisos">';
+  A.slice(0,10).forEach(function(a){h+='<div class="aviso u'+a.u+'">'+esc(a.t)+'</div>';});
+  h+='</div>';return h;
+}
 
 function pintarLogin(){
   var criar=modo==="criar";
@@ -164,10 +197,11 @@ async function load(){
   var M=await sb.from("metricas_funil").select("*");
   var R=await sb.from("recomendacoes").select("*");
   var S=await sb.from("sinais_risco").select("*");
+  var AG=await sb.from("v_alerta_ganho").select("*");
   if(P.error){el("cards").innerHTML='<p class="sub">Erro ao ler dados: '+esc(P.error.message)+'</p>';return;}
-  render(P.data||[],M.data||[],R.data||[],S.data||[]);
+  render(P.data||[],M.data||[],R.data||[],S.data||[],AG.data||[]);
 }
-function render(projetos,metricas,recs,sinais){
+function render(projetos,metricas,recs,sinais,alertaGanho){
   window.PROJ={};projetos.forEach(function(q){window.PROJ[q.id]=q;});
   var today=new Date().toISOString().slice(0,10);
   var recsOpen=recs.filter(function(r){return !r.resultado;});
@@ -176,6 +210,7 @@ function render(projetos,metricas,recs,sinais){
   el("kpiRecs").textContent=recsOpen.length;
   var altaTot=sinaisA.filter(function(s){return s.severidade==="alta";}).length;
   el("kpiRisco").textContent=sinaisA.length;el("kpiRiscoSub").innerHTML="<b>"+altaTot+" altos</b> · hoje";
+  el("avisosWrap").innerHTML=buildAvisos(projetos,recsOpen,sinaisA,metricas,alertaGanho||[],today);
   function score(p){var a=sinaisA.filter(function(s){return s.projeto_id===p.id&&s.severidade==="alta";}).length;var r=recsOpen.filter(function(x){return x.projeto_id===p.id;}).length;return a*100+r;}
   projetos.sort(function(a,b){return score(b)-score(a);});
   var html="";projetos.forEach(function(p){html+=card(p,metricas,recsOpen,sinaisA,today);});
