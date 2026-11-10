@@ -90,6 +90,17 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
 .aviso.u3{border-left-color:var(--alta);color:var(--text)}
 .aviso.u2{border-left-color:var(--media)}
 .aviso.u1{border-left-color:var(--bstrong)}
+.acoes{display:flex;flex-direction:column;gap:12px}
+.acao{background:var(--surface);border:1px solid var(--border);padding:14px}
+.acao.aprovada{border-left:3px solid var(--accent)}
+.acao-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.acao-t{font-weight:600;font-size:14.5px}
+.acao-pj{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.acao-d{font-size:13px;color:var(--t2);margin-top:6px}
+.acao-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.ab{font-size:12.5px;padding:6px 12px;border:1px solid var(--bstrong);background:transparent;color:var(--text);cursor:pointer;font-family:inherit}
+.ab.ap{border-color:var(--accent);color:var(--accent)}
+.ab:hover{border-color:var(--text)}
 </style>
 </head>
 <body>
@@ -103,6 +114,7 @@ h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:2
   <p class="sub">Cada projeto, seu funil, as recomendações em aberto e os riscos — ao vivo, só o que é seu.</p>
   <div class="kpis"><div class="kpi"><div class="n" id="kpiProj">—</div><div class="l">projetos ativos</div></div><div class="kpi"><div class="n accent" id="kpiRecs">—</div><div class="l">recomendações em aberto</div></div><div class="kpi"><div class="n accent" id="kpiRisco">—</div><div class="l" id="kpiRiscoSub">riscos ativos</div></div></div>
   <div id="avisosWrap"></div>
+  <div id="acoesWrap"></div>
   <div class="sec">Projetos — ordenados por risco</div>
   <div class="cards" id="cards"></div>
 </div>
@@ -150,6 +162,29 @@ function buildAvisos(projetos,recsOpen,sinaisA,metricas,ag,today){
   A.slice(0,10).forEach(function(a){h+='<div class="aviso u'+a.u+'">'+esc(a.t)+'</div>';});
   h+='</div>';return h;
 }
+function buildAcoes(projetos,acoes){
+  var props=acoes.filter(function(a){return a.status==="proposta"||a.status==="aprovada";});
+  if(!props.length) return '<div class="sec">Ações propostas</div><p class="sub">Nenhuma ação pendente.</p>';
+  props.sort(function(a,b){return (a.status==="aprovada"?1:0)-(b.status==="aprovada"?1:0);});
+  var h='<div class="sec">Ações propostas — '+props.length+'</div><div class="acoes">';
+  props.forEach(function(a){
+    h+='<div class="acao'+(a.status==="aprovada"?" aprovada":"")+'"><div class="acao-h"><span class="acao-t">'+esc(a.titulo)+'</span><span class="acao-pj">'+esc(nomeP(projetos,a.projeto_id))+(a.status==="aprovada"?" · aprovada":"")+' · '+esc(a.origem)+'</span></div>';
+    if(a.detalhe)h+='<div class="acao-d">'+esc(a.detalhe)+'</div>';
+    h+='<div class="acao-btns">';
+    if(a.status==="proposta")h+='<button class="ab ap" data-id="'+a.id+'" data-st="aprovada" onclick="decidir(this)">Aprovar</button>';
+    h+='<button class="ab" data-id="'+a.id+'" data-st="feita" onclick="decidir(this)">Feito</button>';
+    h+='<button class="ab" data-id="'+a.id+'" data-st="descartada" onclick="decidir(this)">Descartar</button>';
+    h+='</div></div>';
+  });
+  h+='</div>';return h;
+}
+async function decidir(btn){
+  var id=btn.dataset.id, st=btn.dataset.st;
+  var wrap=btn.parentNode; wrap.innerHTML='<span class="src">salvando...</span>';
+  var r=await sb.from("acoes").update({status:st,decidido_em:new Date().toISOString(),decidido_por:window.UID}).eq("id",id);
+  if(r.error){wrap.innerHTML='<span class="src">erro: '+esc(r.error.message)+'</span>';return;}
+  boot();
+}
 
 function pintarLogin(){
   var criar=modo==="criar";
@@ -189,7 +224,7 @@ async function boot(){
   var s=(await sb.auth.getSession()).data.session;
   if(!s){showLogin();return;}
   el("login").style.display="none";el("app").style.display="block";
-  el("toplogo").innerHTML=LOGO;el("whoami").textContent=s.user.email;
+  el("toplogo").innerHTML=LOGO;el("whoami").textContent=s.user.email;window.UID=s.user.id;
   await load();
 }
 async function load(){
@@ -198,10 +233,11 @@ async function load(){
   var R=await sb.from("recomendacoes").select("*");
   var S=await sb.from("sinais_risco").select("*");
   var AG=await sb.from("v_alerta_ganho").select("*");
+  var AC=await sb.from("acoes").select("*").in("status",["proposta","aprovada"]);
   if(P.error){el("cards").innerHTML='<p class="sub">Erro ao ler dados: '+esc(P.error.message)+'</p>';return;}
-  render(P.data||[],M.data||[],R.data||[],S.data||[],AG.data||[]);
+  render(P.data||[],M.data||[],R.data||[],S.data||[],AG.data||[],AC.data||[]);
 }
-function render(projetos,metricas,recs,sinais,alertaGanho){
+function render(projetos,metricas,recs,sinais,alertaGanho,acoes){
   window.PROJ={};projetos.forEach(function(q){window.PROJ[q.id]=q;});
   var today=new Date().toISOString().slice(0,10);
   var recsOpen=recs.filter(function(r){return !r.resultado;});
@@ -211,6 +247,7 @@ function render(projetos,metricas,recs,sinais,alertaGanho){
   var altaTot=sinaisA.filter(function(s){return s.severidade==="alta";}).length;
   el("kpiRisco").textContent=sinaisA.length;el("kpiRiscoSub").innerHTML="<b>"+altaTot+" altos</b> · hoje";
   el("avisosWrap").innerHTML=buildAvisos(projetos,recsOpen,sinaisA,metricas,alertaGanho||[],today);
+  el("acoesWrap").innerHTML=buildAcoes(projetos,acoes||[]);
   function score(p){var a=sinaisA.filter(function(s){return s.projeto_id===p.id&&s.severidade==="alta";}).length;var r=recsOpen.filter(function(x){return x.projeto_id===p.id;}).length;return a*100+r;}
   projetos.sort(function(a,b){return score(b)-score(a);});
   var html="";projetos.forEach(function(p){html+=card(p,metricas,recsOpen,sinaisA,today);});
