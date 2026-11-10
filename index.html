@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cockpit Leaderei</title>
+<meta name="description" content="App logado do cockpit da consultoria Leaderei — funil, recomendações e riscos por projeto, ao vivo do banco.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#000;--surface:#131313;--surface2:#1f1f1f;--border:#313131;--bstrong:#606060;--text:#fff;--t2:#a0a0a0;--muted:#606060;--accent:#df4e01;--alta:#df4e01;--media:#c9a227;--ok:#3fae6b}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.5}
+.mono,.v,.bv{font-family:'JetBrains Mono',monospace}
+.wrap{max-width:1040px;margin:0 auto;padding:24px 16px 64px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);padding-bottom:16px}
+.top svg{height:20px;width:auto;display:block}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.who{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2);display:flex;gap:10px;align-items:center}
+.who a{color:var(--t2);text-decoration:underline;cursor:pointer}
+h1{font-weight:700;font-size:clamp(24px,4vw,34px);letter-spacing:-.02em;margin:26px 0 4px}
+.sub{color:var(--t2);font-size:14px;max-width:60ch}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin:22px 0 0}
+.kpi{background:var(--surface);padding:16px}
+.kpi .n{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:30px}
+.kpi .n.accent{color:var(--accent)}
+.kpi .l{font-size:12px;color:var(--t2);margin-top:2px}
+.sec{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:34px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:720px){.cards{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--border);padding:18px}
+.card.alta{border-color:var(--accent)}
+.hd{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.hd .nm{font-weight:700;font-size:18px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.badge{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border:1px solid var(--bstrong);color:var(--t2)}
+.badge.alta{border-color:var(--alta);color:var(--alta)}
+.badge.media{border-color:var(--media);color:var(--media)}
+.badge.ok{border-color:var(--ok);color:var(--ok)}
+.badge.on{border-color:var(--accent);color:var(--accent)}
+.barswrap{margin:16px 0 4px}
+.barslbl{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--t2);margin-bottom:8px}
+.bar{display:grid;grid-template-columns:62px 1fr 46px;align-items:center;gap:8px;font-size:12px;margin-bottom:6px}
+.bar .bn{color:var(--t2)}
+.bar .bb{height:9px;background:var(--surface2)}
+.bar .bf{display:block;height:9px;background:var(--bstrong)}
+.bar .bf.hot{background:var(--accent)}
+.bar .bv{text-align:right}
+.funnel{display:flex;border:1px solid var(--border);margin:14px 0 4px}
+.funnel .step{flex:1;padding:10px 8px;text-align:center;border-right:1px solid var(--border)}
+.funnel .step:last-child{border-right:0}
+.funnel .step .v{font-weight:600;font-size:18px}
+.funnel .step.hi .v{color:var(--accent)}
+.funnel .step .k{font-size:10px;color:var(--t2);margin-top:2px}
+.nofunnel{margin:14px 0 4px;padding:11px 12px;border:1px dashed var(--bstrong);color:var(--t2);font-size:12.5px}
+.src{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-top:6px}
+.rows{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:9px}
+.row{display:flex;gap:9px;font-size:13px;align-items:flex-start}
+.row .dot{width:7px;height:7px;margin-top:5px;flex:none;background:var(--muted)}
+.row .dot.alta{background:var(--alta)}.row .dot.media{background:var(--media)}.row .dot.rec{background:var(--accent)}
+.row .tx{color:var(--t2)}
+.meta{display:flex;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--t2)}
+.meta b{color:var(--text)}
+.login{min-height:70vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.loginbox{width:100%;max-width:360px}
+.loginbox svg{height:24px;margin-bottom:26px}
+.loginbox h2{font-size:21px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.loginbox p{color:var(--t2);font-size:14px;margin:0 0 20px}
+.fld{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:12px 13px;font-size:15px;font-family:inherit;margin-bottom:10px}
+.fld:focus{outline:none;border-color:var(--accent)}
+.btn{width:100%;background:var(--accent);color:#fff;border:0;padding:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:default}
+.toggle{margin-top:14px;font-size:13px;color:var(--t2)}
+.toggle a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.msg{font-size:12.5px;color:var(--t2);margin-top:12px;min-height:18px}
+</style>
+</head>
+<body>
+<svg id="LOGO" style="display:none" viewBox="0 0 292.86 64.81" xmlns="http://www.w3.org/2000/svg"><g fill="#fff"><path d="M0,0h10.97v63.99H0V0Z"/><path d="M49.09,49.82h11.98c-3.02,9.23-11.15,14.99-22.21,14.99-14.17,0-23.68-9.51-23.68-23.68s9.51-23.49,23.68-23.49,23.58,9.42,23.58,23.49c0,1.28-.09,2.47-.18,3.66H26.51c1.19,6.31,5.76,9.96,12.25,9.96,4.57,0,8.14-1.74,10.33-4.94ZM50.28,34.74c-1.92-4.48-6.03-7.04-11.52-7.04s-9.51,2.56-11.43,7.04h22.94Z"/><path d="M113.44,41.32v22.67h-10.97v-4.39c-2.19,2.83-6.86,5.21-13.53,5.21-13.25,0-22.76-9.51-22.76-23.68s9.51-23.49,23.58-23.49,23.68,9.51,23.68,23.68ZM89.85,27.7c-7.68,0-12.71,5.03-12.71,13.53s5.03,13.53,12.71,13.53,12.61-5.03,12.61-13.53-5.03-13.53-12.61-13.53Z"/><path d="M148.61,52.64c-2.01,1.33-4.51,2.03-7.38,2.03-7.59,0-12.62-5.03-12.62-13.53s5.03-13.53,12.62-13.53,12.71,5.03,12.71,13.53c0,2.3-.37,4.35-1.06,6.11l12.03-15.2V0h-10.97v22.76c-2.19-2.83-6.95-5.21-13.53-5.21-13.25,0-22.76,9.51-22.76,23.68,0,13.44,8.66,22.62,21.45,23.43l9.51-12.02Z"/><path d="M229.16,17.46v10.06c-7.31,0-11.7,3.56-11.7,10.88v25.6h-10.97v-25.6c0-13.89,8.78-20.93,22.67-20.93Z"/><path d="M263.71,49.82h11.97c-3.02,9.23-11.15,14.99-22.21,14.99-14.17,0-23.68-9.51-23.68-23.68s9.51-23.49,23.68-23.49,23.58,9.42,23.58,23.49c0,1.28-.09,2.47-.18,3.66h-35.74c1.19,6.31,5.76,9.96,12.25,9.96,4.57,0,8.14-1.74,10.33-4.94ZM264.9,34.74c-1.92-4.48-6.03-7.04-11.52-7.04s-9.51,2.56-11.43,7.04h22.94Z"/><path d="M281.72,18.28h10.97v45.71h-10.97V18.28Z"/><path d="M202.28,41.14c0-13.44-8.59-22.63-21.71-23.43l-9.82,12.4c2.08-1.57,4.75-2.41,7.85-2.41,5.48,0,9.6,2.56,11.52,7.04h-22.94c.04-.09.08-.17.12-.25l-11.27,14.23c2.8,9.87,11.2,16.09,22.66,16.09s19.2-5.76,22.21-14.99h-11.97c-2.19,3.2-5.76,4.94-10.33,4.94-6.49,0-11.06-3.66-12.25-9.96h35.74c.09-1.19.18-2.38.18-3.66Z"/><path d="M286.25,4.01l-4.59,8.99c-.36.71.15,1.56.96,1.56h9.17c.8,0,1.32-.85.96-1.56l-4.59-8.99c-.4-.78-1.51-.78-1.91,0Z"/></g></svg>
+
+<div id="login" class="login" style="display:none"><div class="loginbox" id="loginbox"></div></div>
+
+<div id="app" class="wrap" style="display:none">
+  <div class="top"><span id="toplogo"></span><span class="eyebrow">Cockpit da Consultoria</span><span class="who"><span id="whoami"></span><a onclick="logout()">sair</a></span></div>
+  <h1>O que precisa da sua atenção hoje</h1>
+  <p class="sub">Cada projeto, seu funil, as recomendações em aberto e os riscos — ao vivo, só o que é seu.</p>
+  <div class="kpis"><div class="kpi"><div class="n" id="kpiProj">—</div><div class="l">projetos ativos</div></div><div class="kpi"><div class="n accent" id="kpiRecs">—</div><div class="l">recomendações em aberto</div></div><div class="kpi"><div class="n accent" id="kpiRisco">—</div><div class="l" id="kpiRiscoSub">riscos ativos</div></div></div>
+  <div class="sec">Projetos — ordenados por risco</div>
+  <div class="cards" id="cards"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+var SUPA_URL="https://yoimpltmxtmbhlfgjzoo.supabase.co";
+var SUPA_KEY="sb_publishable_O3hpZ8Umfo7T67S90_mp5A_Sq9Ueth5";
+var store; try{ store=window.localStorage; }catch(e){ store=undefined; }
+var sb=window.supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:!!store,storage:store}});
+var LOGO=document.getElementById("LOGO").outerHTML.replace('display:none','');
+var modo="entrar";
+function el(id){return document.getElementById(id);}
+function esc(s){return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function fmtInt(n){return n==null?"—":Number(n).toLocaleString("pt-BR");}
+function fmtMoney(v){if(v==null)return "—";v=Number(v);if(v>=1e6)return "R$"+(v/1e6).toFixed(2).replace(".",",")+"mi";if(v>=1e3)return "R$"+Math.round(v/1e3)+"k";return "R$"+v;}
+function fmtDM(d){if(!d)return "—";var p=String(d).slice(0,10).split("-");return p[2]+"/"+p[1];}
+function canalNome(c){var m={whatsapp:"WhatsApp",ligacao:"Ligação",email:"E-mail",linkedin:"LinkedIn",evento:"Evento",webinar:"Webinar",inbound:"Inbound",reativacao:"Reativação",misto:"Misto"};return m[c]||c;}
+
+function pintarLogin(){
+  var criar=modo==="criar";
+  el("loginbox").innerHTML=LOGO
+    +'<h2>Cockpit da Consultoria</h2>'
+    +'<p>'+(criar?"Primeiro acesso: crie uma senha para o seu e-mail Leaderei.":"Entre com seu e-mail e senha.")+'</p>'
+    +'<input id="email" class="fld" type="email" placeholder="voce@leaderei.com.br" autocomplete="email">'
+    +'<input id="senha" class="fld" type="password" placeholder="senha" autocomplete="'+(criar?"new-password":"current-password")+'">'
+    +'<button id="gobtn" class="btn">'+(criar?"Criar acesso":"Entrar")+'</button>'
+    +'<div class="toggle">'+(criar?'Já tem senha? <a onclick="setModo(\'entrar\')">Entrar</a>':'Primeiro acesso? <a onclick="setModo(\'criar\')">Criar senha</a>')+'</div>'
+    +'<div id="loginmsg" class="msg"></div>';
+  el("gobtn").onclick=criar?criarConta:entrar;
+}
+function setModo(m){modo=m;pintarLogin();}
+function showLogin(){el("app").style.display="none";el("login").style.display="flex";pintarLogin();}
+
+async function entrar(){
+  var e=el("email").value.trim(),p=el("senha").value;
+  if(!e||!p){el("loginmsg").textContent="Preencha e-mail e senha.";return;}
+  el("gobtn").disabled=true;el("gobtn").textContent="Entrando...";
+  var r=await sb.auth.signInWithPassword({email:e,password:p});
+  if(r.error){el("loginmsg").textContent="E-mail ou senha incorretos.";el("gobtn").disabled=false;el("gobtn").textContent="Entrar";return;}
+  boot();
+}
+async function criarConta(){
+  var e=el("email").value.trim(),p=el("senha").value;
+  if(!e||p.length<6){el("loginmsg").textContent="Senha de no mínimo 6 caracteres.";return;}
+  el("gobtn").disabled=true;el("gobtn").textContent="Criando...";
+  var r=await sb.auth.signUp({email:e,password:p});
+  if(r.error){el("loginmsg").textContent="Erro: "+r.error.message;el("gobtn").disabled=false;el("gobtn").textContent="Criar acesso";return;}
+  if(r.data && r.data.session){boot();}
+  else{el("loginmsg").textContent="Conta criada, mas a confirmação de e-mail está ligada. Peça para desativar e tente Entrar.";el("gobtn").disabled=false;el("gobtn").textContent="Criar acesso";}
+}
+async function logout(){await sb.auth.signOut();showLogin();}
+
+async function boot(){
+  var s=(await sb.auth.getSession()).data.session;
+  if(!s){showLogin();return;}
+  el("login").style.display="none";el("app").style.display="block";
+  el("toplogo").innerHTML=LOGO;el("whoami").textContent=s.user.email;
+  await load();
+}
+async function load(){
+  var P=await sb.from("projetos").select("*");
+  var M=await sb.from("metricas_funil").select("*");
+  var R=await sb.from("recomendacoes").select("*");
+  var S=await sb.from("sinais_risco").select("*");
+  if(P.error){el("cards").innerHTML='<p class="sub">Erro ao ler dados: '+esc(P.error.message)+'</p>';return;}
+  render(P.data||[],M.data||[],R.data||[],S.data||[]);
+}
+function render(projetos,metricas,recs,sinais){
+  var today=new Date().toISOString().slice(0,10);
+  var recsOpen=recs.filter(function(r){return !r.resultado;});
+  var sinaisA=sinais.filter(function(s){return !s.resolvido;});
+  el("kpiProj").textContent=projetos.length;
+  el("kpiRecs").textContent=recsOpen.length;
+  var altaTot=sinaisA.filter(function(s){return s.severidade==="alta";}).length;
+  el("kpiRisco").textContent=sinaisA.length;el("kpiRiscoSub").innerHTML="<b>"+altaTot+" altos</b> · hoje";
+  function score(p){var a=sinaisA.filter(function(s){return s.projeto_id===p.id&&s.severidade==="alta";}).length;var r=recsOpen.filter(function(x){return x.projeto_id===p.id;}).length;return a*100+r;}
+  projetos.sort(function(a,b){return score(b)-score(a);});
+  var html="";projetos.forEach(function(p){html+=card(p,metricas,recsOpen,sinaisA,today);});
+  el("cards").innerHTML=html||'<p class="sub">Nenhum projeto visível para o seu acesso.</p>';
+}
+function card(p,metricas,recsOpen,sinaisA,today){
+  var sP=sinaisA.filter(function(s){return s.projeto_id===p.id;});
+  var alta=sP.filter(function(s){return s.severidade==="alta";});
+  var media=sP.filter(function(s){return s.severidade==="media";});
+  var rP=recsOpen.filter(function(r){return r.projeto_id===p.id;});
+  var prox=rP.map(function(r){return r.checar_em;}).filter(Boolean).filter(function(d){return d>=today;}).sort()[0];
+  var mP=metricas.filter(function(m){return m.projeto_id===p.id;});
+  var toques=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("toques")===0&&m.contatos!=null;});
+  var resumo=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("neg")===0;})[0];
+  var reun=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("reuni")===0;})[0];
+  var h='<div class="card'+(alta.length?' alta':'')+'">';
+  h+='<div class="hd"><span class="nm">'+esc(p.nome)+'</span>'+(toques.length?'<span class="badge on">ao vivo</span>':'')+'</div>';
+  h+='<div class="badges">';
+  if(alta.length)h+='<span class="badge alta">'+alta.length+' risco alto'+(alta.length>1?'s':'')+'</span>';
+  if(media.length)h+='<span class="badge media">'+media.length+' médio'+(media.length>1?'s':'')+'</span>';
+  if(rP.length)h+='<span class="badge">'+rP.length+' rec'+(rP.length>1?'s':'')+'</span>';
+  if(!alta.length&&!media.length)h+='<span class="badge ok">sem risco ativo</span>';
+  h+='</div>';
+  if(toques.length){
+    var max=Math.max.apply(null,toques.map(function(t){return t.contatos;}));
+    toques.sort(function(a,b){return b.contatos-a.contatos;});
+    h+='<div class="barswrap"><div class="barslbl">TOQUES POR CANAL · 30 DIAS</div>';
+    toques.forEach(function(t){var w=Math.max(3,Math.round(t.contatos/max*100));var hot=(t.canal==="whatsapp"||t.canal==="ligacao")?" hot":"";h+='<div class="bar"><span class="bn">'+esc(canalNome(t.canal))+'</span><span class="bb"><span class="bf'+hot+'" style="width:'+w+'%"></span></span><span class="bv">'+fmtInt(t.contatos)+'</span></div>';});
+    h+='</div>';
+  }
+  if(resumo){
+    h+='<div class="funnel"><div class="step"><div class="v">'+fmtInt(resumo.contatos)+'</div><div class="k">negócios</div></div><div class="step hi"><div class="v">'+fmtInt(resumo.fechamentos)+'</div><div class="k">ganhos</div></div><div class="step hi"><div class="v">'+fmtMoney(resumo.valor_fechado)+'</div><div class="k">ganho</div></div></div>';
+    if(resumo.obs)h+='<div class="src">'+esc(resumo.obs)+'</div>';
+  }else if(!toques.length){h+='<div class="nofunnel">Sem métrica de funil ainda — CRM não cadastrado.</div>';}
+  if(reun)h+='<div class="src">reuniões: '+fmtInt(reun.reunioes)+(reun.obs?' · '+esc(reun.obs):'')+'</div>';
+  h+='<div class="rows">';
+  sP.forEach(function(s){h+='<div class="row"><span class="dot '+esc(s.severidade)+'"></span><span class="tx">'+esc(s.descricao)+'</span></div>';});
+  rP.slice(0,2).forEach(function(r){h+='<div class="row"><span class="dot rec"></span><span class="tx">Rec: '+esc(r.recomendacao)+'</span></div>';});
+  h+='</div>';
+  h+='<div class="meta"><span>próxima checagem <b>'+(prox?fmtDM(prox):"—")+'</b></span></div>';
+  h+='</div>';
+  return h;
+}
+sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_IN")boot();});
+boot();
+</script>
+</body>
+</html>
