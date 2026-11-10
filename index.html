@@ -145,10 +145,10 @@ async function criarConta(){
   var e=el("email").value.trim(),p=el("senha").value;
   if(!e||p.length<6){el("loginmsg").textContent="Senha de no mínimo 6 caracteres.";return;}
   el("gobtn").disabled=true;el("gobtn").textContent="Criando...";
-  var r=await sb.auth.signUp({email:e,password:p});
+  var r=await sb.auth.signUp({email:e,password:p,options:{emailRedirectTo:"https://martinssrenanrm.github.io/leaderei-cockpit/"}});
   if(r.error){el("loginmsg").textContent="Erro: "+r.error.message;el("gobtn").disabled=false;el("gobtn").textContent="Criar acesso";return;}
   if(r.data && r.data.session){boot();}
-  else{el("loginmsg").textContent="Conta criada, mas a confirmação de e-mail está ligada. Peça para desativar e tente Entrar.";el("gobtn").disabled=false;el("gobtn").textContent="Criar acesso";}
+  else{el("loginmsg").innerHTML="Conta criada! Enviamos um <b>link de confirmação</b> para "+esc(e)+". Abra o e-mail <b>neste navegador</b> e clique no link — você cai logado. Depois é só Entrar com a senha.";el("gobtn").disabled=false;el("gobtn").textContent="Criar acesso";}
 }
 async function logout(){await sb.auth.signOut();showLogin();}
 
