@@ -351,7 +351,8 @@ async function load(){
   var P=await sb.from("projetos").select("*");
   if(P.error){el("main").innerHTML='<p class="sub">Erro ao ler dados: '+esc(P.error.message)+'</p>';return;}
   var M=await sb.from("metricas_funil").select("*");var R=await sb.from("recomendacoes").select("*");var S=await sb.from("sinais_risco").select("*");var AG=await sb.from("v_alerta_ganho").select("*");var AC=await sb.from("acoes").select("*").in("status",["proposta","aprovada"]);
-  DADOS={projetos:P.data||[],metricas:M.data||[],recs:R.data||[],sinais:S.data||[],alertaGanho:AG.data||[],acoes:AC.data||[]};
+  var RGL=await sb.from("regras_globais").select("*").eq("ativo",true).order("criado_em");
+  DADOS={projetos:P.data||[],metricas:M.data||[],recs:R.data||[],sinais:S.data||[],alertaGanho:AG.data||[],acoes:AC.data||[],regrasGlobais:RGL.data||[]};
   DADOS.recsOpen=DADOS.recs.filter(function(r){return !r.resultado;});DADOS.sinaisA=DADOS.sinais.filter(function(s){return !s.resolvido;});
   render();
 }
@@ -400,8 +401,16 @@ function renderGeral(){
   h+='<div class="sec"><div class="sec-h"><h2>Projetos</h2><span class="src">ordenados por risco</span></div><div class="pjrows">';
   projsOrdenados().forEach(function(p){h+=rowProjeto(p);});
   h+='</div></div>';
+  h+='<div class="sec"><div class="sec-h"><h2>Regras globais</h2><span class="src">valem para todos os clientes</span></div><div class="regras-wrap">'+tabRegrasGlobais()+'</div></div>';
   el("main").innerHTML=h;
 }
+function tabRegrasGlobais(){var rs=DADOS.regrasGlobais||[];
+  var h='<p class="sub" style="margin-bottom:14px">Boas práticas de vendas que o consultor aplica em todos os projetos. Por cliente, use "Regras que você ensina" no Playbook.</p>';
+  if(rs.length){h+='<div class="regras">';rs.forEach(function(r){h+='<div class="regra">'+esc(r.regra)+'<span class="del" data-id="'+r.id+'" onclick="delRegraGlobal(this)">✕</span></div>';});h+='</div>';}
+  else h+='<p class="vazio">Nenhuma regra global ainda.</p>';
+  h+='<div class="regraform"><textarea id="novaregraglobal" placeholder="Ex.: todo follow-up sai com próximo passo datado."></textarea><div style="margin-top:10px"><button class="btn sm" onclick="addRegraGlobal(this)">Adicionar regra global</button></div></div>';return h;}
+async function addRegraGlobal(btn){var ta=el("novaregraglobal");if(!ta)return;var txt=ta.value.trim();if(txt.length<4)return;btn.disabled=true;btn.textContent="Salvando...";var r=await sb.from("regras_globais").insert({regra:txt,criado_por:window.UID});if(r.error){btn.disabled=false;btn.textContent="Adicionar regra global";alert("Erro: "+r.error.message);return;}await load();}
+async function delRegraGlobal(span){if(!confirm("Remover esta regra global?"))return;var r=await sb.from("regras_globais").delete().eq("id",span.dataset.id);if(r.error){alert("Erro: "+r.error.message);return;}await load();}
 function rowProjeto(p){
   var sP=DADOS.sinaisA.filter(function(s){return s.projeto_id===p.id;}),alta=sP.filter(function(s){return s.severidade==="alta";}),media=sP.filter(function(s){return s.severidade==="media";});
   var acP=DADOS.acoes.filter(function(a){return a.projeto_id===p.id;}),mP=DADOS.metricas.filter(function(m){return m.projeto_id===p.id;});
@@ -540,7 +549,8 @@ async function montarFunil(pid){
 
 /* TELA: Conversa — o centro */
 function renderConversa(p,c){
-  var h=pageHead(p.nome,"Conversa com o consultor","");
+  var acao='<button class="btn sm" onclick="pedirEstrategia()">Estratégia (Opus)</button>';
+  var h=pageHead(p.nome,"Conversa com o consultor","",acao);
   h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
   h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div class="chatinput"><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'…" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
@@ -607,6 +617,7 @@ async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt)re
   btn.disabled=false;btn.textContent="Enviar";renderChat();}
 var SUGESTOES=["Criar um gráfico","Fazer uma ação em massa no CRM","Tenho uma dúvida sobre processos"];
 function usarSugestao(b){var inp=el("chatin");if(!inp)return;inp.value=b.textContent;enviar();}
+function pedirEstrategia(){var inp=el("chatin");if(!inp)return;inp.value="Monte a estratégia comercial completa deste projeto: diagnóstico do funil e gargalo, prioridades, plano de ação por função (pré-vendas/closer/gestão) e metas.";enviar();}
 function whatsAcao(b){window.open("https://wa.me/?text="+encodeURIComponent(b.dataset.msg||""),"_blank");}
 
 /* dossiê */
