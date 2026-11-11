@@ -225,9 +225,12 @@ table.tbl td:first-child{color:var(--text);font-weight:600}
 .chat{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:420px;border:1px solid var(--border);background:var(--surface);border-radius:2px;max-width:900px}
 .chatmsgs{flex:1;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
 .chatempty{color:var(--muted);font-size:14px;margin:auto;text-align:center;max-width:44ch;line-height:1.6}
-.msg{max-width:84%;padding:11px 14px;font-size:14.5px;line-height:1.55;border-radius:2px}
-.msg.eu{align-self:flex-end;background:var(--accent);color:#fff}
-.msg.ia{align-self:flex-start;background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.msg{max-width:100%;padding:13px 16px;font-size:15px;line-height:1.62;border-radius:8px}
+.msg.eu{align-self:stretch;background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.msg.ia{align-self:stretch;background:transparent;color:var(--text);padding-left:2px;padding-right:2px}
+.sugs{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;justify-content:center}
+.sug{background:var(--surface2);border:1px solid var(--border);color:var(--t2);font:500 13px var(--sans);padding:8px 13px;border-radius:999px;cursor:pointer}
+.sug:hover{border-color:var(--accent);color:var(--text)}
 .msg.ia h1,.msg.ia h2,.msg.ia h3{font-size:15px;margin:6px 0;color:var(--accent)}
 .msg.ia p{margin:6px 0}.msg.ia ul,.msg.ia ol{padding-left:18px;margin:6px 0}.msg.ia strong{color:var(--text)}
 .chatinput{display:flex;gap:10px;padding:12px;border-top:1px solid var(--border)}
@@ -339,7 +342,7 @@ function projScore(p){var a=DADOS.sinaisA.filter(function(s){return s.projeto_id
 function projsOrdenados(){return DADOS.projetos.slice().sort(function(a,b){return projScore(b)-projScore(a);});}
 
 /* navegação (sidebar) */
-var PJSCREENS=[{k:"dashboard",nome:"Dashboard"},{k:"conversa",nome:"Conversa"},{k:"playbook",nome:"Playbook"},{k:"abordagem",nome:"Abordagem"},{k:"demandas",nome:"Demandas"}];
+var PJSCREENS=[{k:"dashboard",nome:"Dashboard"},{k:"conversa",nome:"Conversa"},{k:"playbook",nome:"Playbook"},{k:"demandas",nome:"Demandas"}];
 function screenNome(k){var s=PJSCREENS.filter(function(x){return x.k===k;})[0];return s?s.nome:"";}
 function renderNav(){
   var h='<div class="navg solo"><ul><li><span class="navl'+(ESTADO.view==="geral"?" on":"")+'" onclick="navegar(\'geral\')">Visão geral</span></li></ul></div>';
@@ -423,6 +426,13 @@ function renderProjeto(){
 }
 
 /* TELA: Dashboard — só números */
+function warRoomSec(p,c){
+  var h='<div class="sec"><div class="sec-h"><h2>War Room</h2><span class="src">Opus · sob demanda</span></div>';
+  h+='<p class="sub" style="margin-bottom:14px">Prioridades da semana, contas quentes, riscos e o que levar para a próxima reunião.</p>';
+  h+='<button class="btn" data-fn="war-room" data-slug="'+esc(p.slug)+'" onclick="gerarDoc(this)">Gerar War Room</button>';
+  h+=tabDocs(p,c);
+  return h+'</div>';
+}
 function renderDashboard(p,c){
   var mP=DADOS.metricas.filter(function(m){return m.projeto_id===p.id;});
   var resumo=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("neg")===0;})[0];
@@ -430,7 +440,7 @@ function renderDashboard(p,c){
   var toques=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("toques")===0&&m.contatos!=null;});
   var totToq=toques.reduce(function(s,m){return s+(m.contatos||0);},0);
   var h=pageHead(p.nome,"Dashboard","Os números do projeto num olhar.");
-  if(!resumo&&!toques.length){h+='<div class="sec" style="border-bottom:0"><p class="vazio">Sem métricas sincronizadas ainda. O sync do Pipedrive popula este painel.</p></div>';return h;}
+  if(!resumo&&!toques.length){h+='<div class="sec"><p class="vazio">Sem métricas sincronizadas ainda. O sync do Pipedrive popula este painel.</p></div>';h+=warRoomSec(p,c);return h;}
   h+='<div class="facts">';
   h+='<div class="fact"><div class="big a">'+(resumo?fmtInt(resumo.fechamentos):"—")+'</div><div class="lb">ganhos</div></div>';
   h+='<div class="fact"><div class="big">'+(resumo?fmtMoney(resumo.valor_fechado):"—")+'</div><div class="lb">valor contratado</div></div>';
@@ -441,13 +451,14 @@ function renderDashboard(p,c){
   var abertos=(c.funil||[]).filter(function(f){return f.status==="open";}).sort(function(a,b){return b.n-a.n;});
   if(abertos.length){var mx2=Math.max.apply(null,abertos.map(function(f){return f.n;}));var hf='';abertos.slice(0,10).forEach(function(f){var w=Math.max(3,Math.round(f.n/mx2*100));hf+='<div class="bar" style="grid-template-columns:minmax(0,1fr) 90px 44px"><span class="bn" style="font-size:13px">'+esc(((f.pipeline||"").trim()+" · "+(f.etapa||"")).slice(0,36))+'</span><span class="bb"><span class="bf" style="width:'+w+'%"></span></span><span class="bv">'+f.n+'</span></div>';});h+='<div class="sec"><div class="sec-h"><h2>Pipeline aberto</h2><span class="src">por etapa</span></div><div class="bars">'+hf+'</div></div>';}
   if((c.coorte||[]).length){var co=c.coorte.slice().sort(function(a,b){return a.mes<b.mes?1:-1;});var ht='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>mês</th><th>entraram</th><th>ganho</th><th>perdido</th></tr></thead><tbody>';co.slice(0,6).forEach(function(x){ht+='<tr><td>'+x.mes+'</td><td>'+x.entraram+'</td><td>'+x.won+'</td><td>'+x.lost+'</td></tr>';});ht+='</tbody></table></div>';h+='<div class="sec"><div class="sec-h"><h2>Coorte</h2><span class="src">entrada → resultado</span></div>'+ht+'</div>';}
+  h+=warRoomSec(p,c);
   return h;
 }
 
 /* TELA: Conversa — o centro */
 function renderConversa(p,c){
   var h=pageHead(p.nome,"Conversa com o consultor","");
-  h+='<p class="convnote">O consultor conhece os números, as regras e a história deste cliente — e é ele quem alimenta o resto do portal. Pergunte, discuta estratégia, diga por que uma ação não vale ou ensine uma regra de negócio.</p>';
+  h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
   h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div class="chatinput"><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'…" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
 }
@@ -496,7 +507,7 @@ function renderDemandas(p,c){
 
 /* chat */
 function renderChat(){var c=CACHE[ESTADO.pid]||{};var msgs=c.conversa||[];var box=el("chatmsgs");if(!box)return;
-  if(!msgs.length){box.innerHTML='<div class="chatempty">Converse com o consultor do '+esc(proj().nome)+'. Ele conhece os números e as regras deste projeto.</div>';}
+  if(!msgs.length){box.innerHTML='<div class="chatempty">Converse com o consultor do '+esc(proj().nome)+'. Ele conhece os números e as regras deste projeto.<div class="sugs">'+SUGESTOES.map(function(s){return '<button class="sug" onclick="usarSugestao(this)">'+esc(s)+'</button>';}).join('')+'</div></div>';}
   else{var h='';msgs.forEach(function(m){h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+(m.papel==="assistant"?mdRender(m.conteudo):esc(m.conteudo))+'</div>';});box.innerHTML=h;}
   box.scrollTop=box.scrollHeight;}
 async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt)return;
@@ -509,6 +520,9 @@ async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt)re
     c.conversa.push({papel:"assistant",conteudo:(err||!r.data||!r.data.resposta)?("(erro: "+(err||"não respondeu")+")"):r.data.resposta});
   }catch(e){c.conversa.push({papel:"assistant",conteudo:"(falha: "+String(e&&e.message||e)+")"});}
   btn.disabled=false;btn.textContent="Enviar";renderChat();}
+var SUGESTOES=["Criar um gráfico","Fazer uma ação em massa no CRM","Tenho uma dúvida sobre processos"];
+function usarSugestao(b){var inp=el("chatin");if(!inp)return;inp.value=b.textContent;enviar();}
+function whatsAcao(b){window.open("https://wa.me/?text="+encodeURIComponent(b.dataset.msg||""),"_blank");}
 
 /* dossiê */
 async function reconstruirDossie(btn){var slug=btn.dataset.slug,t0=btn.textContent;btn.disabled=true;btn.textContent="Lendo reuniões (~1min)…";
@@ -521,7 +535,7 @@ async function reconstruirDossie(btn){var slug=btn.dataset.slug,t0=btn.textConte
 function tabAcoes(p){var props=DADOS.acoes.filter(function(a){return a.projeto_id===p.id;});
   if(!props.length)return '<p class="vazio">Nenhuma ação pendente. O Agente Consultor roda todo dia e propõe novas.</p>';
   props.sort(function(a,b){return (a.status==="aprovada"?1:0)-(b.status==="aprovada"?1:0);});var h='<div class="acoes">';
-  props.forEach(function(a){h+='<div class="acao'+(a.status==="aprovada"?" aprovada":"")+'"><div class="acao-h"><span class="acao-t">'+esc(a.titulo)+'</span><span class="acao-pj">'+(a.status==="aprovada"?"aprovada · ":"")+esc(a.origem)+'</span></div>';if(a.detalhe)h+='<div class="acao-d">'+esc(a.detalhe)+'</div>';h+='<div class="acao-btns">';if(a.status==="proposta")h+='<button class="ab ap" data-id="'+a.id+'" data-st="aprovada" onclick="decidir(this)">Aprovar</button>';h+='<button class="ab" data-id="'+a.id+'" data-st="feita" onclick="decidir(this)">Feito</button><button class="ab" data-id="'+a.id+'" data-st="descartada" onclick="decidir(this)">Descartar</button></div></div>';});
+  props.forEach(function(a){h+='<div class="acao'+(a.status==="aprovada"?" aprovada":"")+'"><div class="acao-h"><span class="acao-t">'+esc(a.titulo)+'</span><span class="acao-pj">'+(a.status==="aprovada"?"aprovada · ":"")+esc(a.origem)+'</span></div>';if(a.detalhe)h+='<div class="acao-d">'+esc(a.detalhe)+'</div>';h+='<div class="acao-btns">';if(a.status==="proposta")h+='<button class="ab ap" data-id="'+a.id+'" data-st="aprovada" onclick="decidir(this)">Aprovar</button>';h+='<button class="ab" data-id="'+a.id+'" data-st="feita" onclick="decidir(this)">Feito</button><button class="ab" data-id="'+a.id+'" data-st="descartada" onclick="decidir(this)">Descartar</button><button class="ab" data-msg="'+esc("Sobre "+p.nome+" — "+a.titulo+(a.detalhe?": "+a.detalhe:""))+'" onclick="whatsAcao(this)">WhatsApp</button></div></div>';});
   return h+'</div>';}
 async function decidir(btn){var id=btn.dataset.id,st=btn.dataset.st;var w=btn.parentNode;w.innerHTML='<span class="src">salvando...</span>';var r=await sb.from("acoes").update({status:st,decidido_em:new Date().toISOString(),decidido_por:window.UID}).eq("id",id);if(r.error){w.innerHTML='<span class="src">erro</span>';return;}if(st==="aprovada"){var a=DADOS.acoes.filter(function(x){return x.id===id;})[0];if(a)a.status="aprovada";}else{DADOS.acoes=DADOS.acoes.filter(function(x){return x.id!==id;});}render();}
 function tabRegras(p,c){var h='<p class="sub" style="margin-bottom:14px">O que todos os agentes respeitam. Ensine o que o dado não diz.</p>';
