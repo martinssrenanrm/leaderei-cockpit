@@ -548,19 +548,21 @@ function renderConversa(p,c){
 
 /* TELA: Playbook — conhecimento, com sub-abas */
 function renderPlaybook(p,c){
-  var temDossie=(c.dossie||[]).length>0;
-  var action=temDossie?dossieBtn(p,"Atualizar dossiê (Opus)"):'';
-  var h=pageHead(p.nome,"Playbook","Como se vende aqui — e as regras que você ensina ao consultor.",action);
-  var cand=[["perfil","Perfil"],["playbook","Canais & táticas"],["regras","Regras do negócio"],["estrategia","Estratégia"],["historico","Histórico"]];
+  var cand=[["treino_comum","Estrutura comercial"],["guia_prevendas","Pré-vendas"],["guia_closer","Closer"],["guia_gestao","Gestão"]];
+  var temGuias=cand.some(function(x){return dsec(c,x[0]);});
+  var action=temGuias?playbookBtn(p,"Atualizar treinamento (Opus)"):'';
+  var h=pageHead(p.nome,"Playbook","Treinamento do time: como se vende aqui, função por função.",action);
   var tabs=[];cand.forEach(function(x){if(dsec(c,x[0]))tabs.push({k:x[0],nome:x[1]});});
   tabs.push({k:"suas",nome:"Regras que você ensina"});
   var cur=tabs.filter(function(t){return t.k===ESTADO.pbsec;})[0]||tabs[0];
-  if(!temDossie&&tabs.length===1){h+=semDossie(p,"O playbook de canais, táticas e regras");}
+  if(!temGuias){h+=semTreino(p);}
   h+='<div class="subtabs">';tabs.forEach(function(t){h+='<button class="subtab'+(t.k===cur.k?" on":"")+'" data-k="'+t.k+'" onclick="setPbSec(this.dataset.k)">'+esc(t.nome)+'</button>';});h+='</div>';
   if(cur.k==="suas"){h+='<div class="regras-wrap">'+tabRegras(p,c)+'</div>';}
   else{var s=dsec(c,cur.k);h+='<div class="prose">'+mdRender(s?s.conteudo_md||"":"")+'</div>';}
   return h;
 }
+function playbookBtn(p,txt){return '<button class="btn sm" data-slug="'+esc(p.slug)+'" onclick="treinarPlaybook(this)">'+txt+'</button>';}
+function semTreino(p){return '<div class="sec" style="border-bottom:0"><p class="sub" style="margin-bottom:14px">O treinamento deste cliente ainda não foi montado. Os guias por função (Estrutura comercial · Pré-vendas · Closer · Gestão) aparecem aqui depois que o consultor lê o método e as reuniões.</p>'+playbookBtn(p,"Construir treinamento (Opus)")+'</div>';}
 function setPbSec(k){ESTADO.pbsec=k;render();}
 
 /* TELA: Abordagem */
@@ -611,6 +613,18 @@ function whatsAcao(b){window.open("https://wa.me/?text="+encodeURIComponent(b.da
 async function reconstruirDossie(btn){var slug=btn.dataset.slug,t0=btn.textContent;btn.disabled=true;btn.textContent="Lendo reuniões (~1min)…";
   try{var r=await sb.functions.invoke("manter-dossie",{body:{projeto:slug}});var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     if(err){alert("Não consegui: "+err);}else{delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();return;}
+  }catch(e){alert("Falha: "+String(e&&e.message||e));}
+  btn.disabled=false;btn.textContent=t0;}
+
+/* treinamento (Playbook por função): planner (barato) decide os guias; 1 worker Opus por guia, em paralelo */
+async function treinarPlaybook(btn){var slug=btn.dataset.slug,t0=btn.textContent;btn.disabled=true;btn.textContent="Montando guias (~2min)…";
+  try{
+    var pl=await sb.functions.invoke("treinar-playbook",{body:{projeto:slug,modo:"build"}});
+    var perr=(pl.data&&pl.data.error)||(pl.error&&pl.error.message);
+    if(perr){alert("Não consegui: "+perr);btn.disabled=false;btn.textContent=t0;return;}
+    var plano=(pl.data&&pl.data.plano)||[],reunTxt=(pl.data&&pl.data.reunTxt)||"";
+    await Promise.all(plano.map(function(secao){return sb.functions.invoke("treinar-playbook",{body:{projeto:slug,secao:secao,reunTxt:reunTxt}});}));
+    delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();return;
   }catch(e){alert("Falha: "+String(e&&e.message||e));}
   btn.disabled=false;btn.textContent=t0;}
 
