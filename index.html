@@ -485,6 +485,8 @@ function renderDemandas(p,c){
   var acN=DADOS.acoes.filter(function(a){return a.projeto_id===p.id;}).length;
   var pr=dsec(c,"proxima_reuniao"),pa=dsec(c,"proximas_acoes");
   var h=pageHead(p.nome,"Demandas","O que pede ação agora: pauta da próxima reunião, ações propostas e avisos.");
+  var dg=dsec(c,"diagnostico");
+  if(dg)h+='<div class="sec"><div class="sec-h"><h2>Diagnóstico</h2><span class="src">dentro / fora do eixo</span></div><div class="prose">'+mdRender(dg.conteudo_md||"")+'</div></div>';
   if(pr)h+='<div class="sec"><div class="now-block"><div class="nk">Próxima reunião — pauta</div><div class="prose">'+mdRender(pr.conteudo_md||"")+'</div></div></div>';
   if(pa)h+='<div class="sec"><div class="sec-h"><h2>Próximas ações</h2><span class="src">por impacto</span></div><div class="prose">'+mdRender(pa.conteudo_md||"")+'</div></div>';
   h+='<div class="sec"><div class="sec-h"><h2>Ações'+(acN?" · "+acN:"")+'</h2><span class="src">aprovar · feito · descartar</span></div>'+tabAcoes(p)+'</div>';
