@@ -109,6 +109,23 @@ p{margin:0}
 .bar .bf.hot{background:var(--accent)}
 .bar .bv{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .bar .bo{grid-column:2/4;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:-6px}
+.functrl{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.functrl label{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.functrl select{font:inherit;font-size:13px;color:var(--text);background:var(--surface3);border:1px solid var(--bstrong);border-radius:2px;padding:7px 9px;text-transform:none;letter-spacing:0}
+.funrates{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.frate{border:1px solid var(--bstrong);border-left:3px solid var(--accent);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.frate .v{font-weight:700;font-size:26px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--accent);line-height:1}
+.frate .k{color:var(--t2);font-size:12.5px}
+.ftopo{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
+.funnel{display:flex;flex-direction:column;gap:12px}
+.fstep{display:grid;grid-template-columns:160px 1fr 128px;align-items:center;gap:14px}
+.fstep .fsl{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fstep .fsn{font-weight:600;font-size:14px}
+.fstep .fconv{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.fstep .fsbar{height:22px;background:var(--surface3);position:relative}
+.fstep .fsf{display:block;height:22px;background:var(--accent)}
+.fstep .fsv{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
+@media(max-width:560px){.funrates{grid-template-columns:1fr}.fstep{grid-template-columns:104px 1fr 72px;gap:10px}.fstep .fsv{font-size:12.5px}}
 
 /* ===== table ===== */
 .tbl-wrap{overflow-x:auto;border-top:1px solid var(--bstrong);margin-top:4px}
@@ -365,7 +382,8 @@ async function carregarProjeto(pid){
   var RG=await sb.from("regras_projeto").select("*").eq("projeto_id",pid).order("criado_em");
   var CV=await sb.from("conversas").select("papel,conteudo").eq("projeto_id",pid).order("criado_em");
   var DS=await sb.from("dossie_secoes").select("*").eq("projeto_id",pid).order("ordem");
-  CACHE[pid]={funil:F.data||[],coorte:C.data||[],ganhos:G.data||[],docs:D.data||[],regras:RG.data||[],conversa:CV.data||[],dossie:DS.data||[]};
+  var PL=await sb.from("v_funil_pipelines").select("*").eq("projeto_id",pid);
+  CACHE[pid]={funil:F.data||[],coorte:C.data||[],ganhos:G.data||[],docs:D.data||[],regras:RG.data||[],conversa:CV.data||[],dossie:DS.data||[],pipelines:PL.data||[]};
 }
 function render(){renderNav();setCrumb();if(ESTADO.view==="geral")renderGeral();else renderProjeto();}
 
@@ -422,7 +440,7 @@ function semDossie(p,oque){return '<div class="sec" style="border-bottom:0"><p c
 function renderProjeto(){
   var p=proj();if(!p){navegar("geral");return;}var c=CACHE[p.id]||{};var v=ESTADO.pjview||"dashboard";
   var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
-  el("main").innerHTML=body;if(v==="conversa")renderChat();
+  el("main").innerHTML=body;if(v==="conversa")renderChat();else if(v==="dashboard")montarFunil(p.id);
 }
 
 /* TELA: Dashboard — só números */
@@ -440,7 +458,7 @@ function renderDashboard(p,c){
   var toques=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("toques")===0&&m.contatos!=null;});
   var totToq=toques.reduce(function(s,m){return s+(m.contatos||0);},0);
   var h=pageHead(p.nome,"Dashboard","Os números do projeto num olhar.");
-  if(!resumo&&!toques.length){h+='<div class="sec"><p class="vazio">Sem métricas sincronizadas ainda. O sync do Pipedrive popula este painel.</p></div>';h+=warRoomSec(p,c);return h;}
+  if(!resumo&&!toques.length){h+='<div class="sec"><p class="vazio">Sem métricas sincronizadas ainda. O sync do Pipedrive popula este painel.</p></div>';h+=funilSec(p,c);h+=warRoomSec(p,c);return h;}
   h+='<div class="facts">';
   h+='<div class="fact"><div class="big a">'+(resumo?fmtInt(resumo.fechamentos):"—")+'</div><div class="lb">ganhos</div></div>';
   h+='<div class="fact"><div class="big">'+(resumo?fmtMoney(resumo.valor_fechado):"—")+'</div><div class="lb">valor contratado</div></div>';
@@ -448,11 +466,76 @@ function renderDashboard(p,c){
   h+='<div class="fact"><div class="big">'+fmtInt(totToq)+'</div><div class="lb">toques · 30d</div></div>';
   h+='</div>';
   if(toques.length){var mx=Math.max.apply(null,toques.map(function(t){return t.contatos;}));var ts=toques.slice().sort(function(a,b){return b.contatos-a.contatos;});var hc='';ts.forEach(function(t){var w=Math.max(3,Math.round(t.contatos/mx*100));var hot=(t.canal==="whatsapp"||t.canal==="ligacao")?" hot":"";hc+='<div class="bar"><span class="bn">'+esc(canalNome(t.canal))+'</span><span class="bb"><span class="bf'+hot+'" style="width:'+w+'%"></span></span><span class="bv">'+fmtInt(t.contatos)+'</span>'+(t.obs?'<span class="bo">'+esc(t.obs)+'</span>':'')+'</div>';});h+='<div class="sec"><div class="sec-h"><h2>Toques por canal</h2><span class="src">30 dias</span></div><div class="bars">'+hc+'</div></div>';}
-  var abertos=(c.funil||[]).filter(function(f){return f.status==="open";}).sort(function(a,b){return b.n-a.n;});
-  if(abertos.length){var mx2=Math.max.apply(null,abertos.map(function(f){return f.n;}));var hf='';abertos.slice(0,10).forEach(function(f){var w=Math.max(3,Math.round(f.n/mx2*100));hf+='<div class="bar" style="grid-template-columns:minmax(0,1fr) 90px 44px"><span class="bn" style="font-size:13px">'+esc(((f.pipeline||"").trim()+" · "+(f.etapa||"")).slice(0,36))+'</span><span class="bb"><span class="bf" style="width:'+w+'%"></span></span><span class="bv">'+f.n+'</span></div>';});h+='<div class="sec"><div class="sec-h"><h2>Pipeline aberto</h2><span class="src">por etapa</span></div><div class="bars">'+hf+'</div></div>';}
+  h+=funilSec(p,c);
   if((c.coorte||[]).length){var co=c.coorte.slice().sort(function(a,b){return a.mes<b.mes?1:-1;});var ht='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>mês</th><th>entraram</th><th>ganho</th><th>perdido</th></tr></thead><tbody>';co.slice(0,6).forEach(function(x){ht+='<tr><td>'+x.mes+'</td><td>'+x.entraram+'</td><td>'+x.won+'</td><td>'+x.lost+'</td></tr>';});ht+='</tbody></table></div>';h+='<div class="sec"><div class="sec-h"><h2>Coorte</h2><span class="src">entrada → resultado</span></div>'+ht+'</div>';}
   h+=warRoomSec(p,c);
   return h;
+}
+
+/* ---- Funil (RPC funil_cockpit) ---- */
+function projById(id){return (DADOS.projetos||[]).filter(function(x){return x.id===id;})[0];}
+function funCfg(pid,c){
+  if(!c._funil){
+    var pls=(c.pipelines||[]).map(function(x){return x.pipeline;});
+    var padrao=pls.indexOf("Vendas")>=0?"Vendas":(pls[0]||"");
+    c._funil={pipeline:padrao,periodo:"tudo",base:"criacao"};
+  }
+  return c._funil;
+}
+function fopt(v,label,cur){return '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+label+'</option>';}
+function funilSec(p,c){
+  var pls=c.pipelines||[];
+  var h='<div class="sec"><div class="sec-h"><h2>Funil</h2><span class="src">conversão passo a passo</span></div>';
+  if(!pls.length){return h+'<p class="vazio">O funil aparece quando o Pipedrive deste cliente estiver conectado.</p></div>';}
+  var cfg=funCfg(p.id,c);
+  h+='<div class="functrl">';
+  h+='<label>Funil<select id="fpipe" onchange="onFunil(\''+p.id+'\')">'+pls.map(function(x){return '<option'+(x.pipeline===cfg.pipeline?' selected':'')+'>'+esc(x.pipeline)+'</option>';}).join('')+'</select></label>';
+  h+='<label>Período<select id="fper" onchange="onFunil(\''+p.id+'\')">'+fopt("tudo","Tudo",cfg.periodo)+fopt("30d","Últimos 30 dias",cfg.periodo)+fopt("90d","Últimos 90 dias",cfg.periodo)+fopt("ano","Este ano",cfg.periodo)+fopt("12m","Últimos 12 meses",cfg.periodo)+'</select></label>';
+  h+='<label>Base<select id="fbase" onchange="onFunil(\''+p.id+'\')">'+fopt("criacao","Data de criação",cfg.base)+fopt("atividade","Última atividade",cfg.base)+'</select></label>';
+  h+='</div><div id="funilbox"><p class="sub">Carregando funil…</p></div></div>';
+  return h;
+}
+function onFunil(pid){
+  var c=CACHE[pid];if(!c)return;var cfg=funCfg(pid,c);
+  var a=el("fpipe"),b=el("fper"),d=el("fbase");
+  if(a)cfg.pipeline=a.value;if(b)cfg.periodo=b.value;if(d)cfg.base=d.value;
+  montarFunil(pid);
+}
+function periodoRange(per){
+  if(per==="tudo")return {desde:null,ate:null};
+  var hoje=new Date(),ate=hoje.toISOString().slice(0,10),desde;
+  if(per==="30d")desde=new Date(hoje.getTime()-30*864e5);
+  else if(per==="90d")desde=new Date(hoje.getTime()-90*864e5);
+  else if(per==="12m")desde=new Date(hoje.getTime()-365*864e5);
+  else if(per==="ano")desde=new Date(hoje.getFullYear(),0,1);
+  return {desde:desde.toISOString().slice(0,10),ate:ate};
+}
+function fpct(a,b){return b>0?(Math.round(a/b*1000)/10).toLocaleString("pt-BR")+"%":"—";}
+function funilHTML(j){
+  var e=j.etapas||[];if(!e.length)return '<p class="vazio">Sem dados neste filtro.</p>';
+  var max=Math.max.apply(null,e.map(function(x){return x.n;}))||1;
+  var h='<div class="funrates">'
+    +'<div class="frate"><span class="v">'+fpct(e[1].n,e[0].n)+'</span><span class="k">Cadência → Reunião agendada</span></div>'
+    +'<div class="frate"><span class="v">'+fpct(e[4].n,e[2].n)+'</span><span class="k">Reuniões realizadas → Venda</span></div>'
+    +'</div>';
+  h+='<div class="ftopo">Base: '+fmtInt(j.topo)+' no topo (Novo/Pesquisa), fora da conversão · '+fmtInt(j.total)+' no total do funil.</div>';
+  h+='<div class="funnel">';
+  e.forEach(function(st,i){
+    var w=Math.max(4,Math.round(st.n/max*100));
+    var conv=i>0?'<span class="fconv">'+fpct(st.n,e[i-1].n)+' do passo anterior</span>':'<span class="fconv">entrada da conversão</span>';
+    var val=(st.chave==="venda"&&st.valor)?' · '+fmtMoney(st.valor):'';
+    h+='<div class="fstep"><div class="fsl"><span class="fsn">'+esc(st.rotulo)+'</span>'+conv+'</div><div class="fsbar"><span class="fsf" style="width:'+w+'%"></span></div><div class="fsv">'+fmtInt(st.n)+val+'</div></div>';
+  });
+  return h+'</div>';
+}
+async function montarFunil(pid){
+  var c=CACHE[pid];if(!c)return;var box=el("funilbox");if(!box)return;
+  if(!(c.pipelines||[]).length)return;
+  var cfg=funCfg(pid,c),r=periodoRange(cfg.periodo),pj=projById(pid);
+  var res=await sb.rpc("funil_cockpit",{p_slug:pj.slug,p_pipeline:cfg.pipeline,p_desde:r.desde,p_ate:r.ate,p_base:cfg.base});
+  box=el("funilbox");if(!box)return;
+  if(res.error){box.innerHTML='<p class="vazio">Erro ao carregar o funil.</p>';return;}
+  box.innerHTML=funilHTML(res.data||{});
 }
 
 /* TELA: Conversa — o centro */
