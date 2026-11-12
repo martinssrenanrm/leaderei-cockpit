@@ -228,6 +228,23 @@ table.tbl td:first-child{color:var(--text);font-weight:600}
 .doclink{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:12px 2px;border-bottom:1px solid var(--border);cursor:pointer;color:var(--text);font-weight:500;font-size:14.5px}
 .doclink:hover{color:var(--accent)}
 .doclink .dt{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--info)}
+/* classificar documentos */
+.clsbox{display:flex;flex-direction:column;gap:10px;max-width:720px}
+.fld2{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:9px 11px;font-size:14px;font-family:inherit;border-radius:2px}
+.fld2:focus{outline:none;border-color:var(--accent)}
+.clsta{min-height:120px;resize:vertical;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:11px;font-size:14px;font-family:inherit;border-radius:2px}
+.clsta:focus{outline:none;border-color:var(--accent)}
+.clsrow{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+.clslbl{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fsel{font:inherit;font-size:13px;color:var(--text);background:var(--surface3);border:1px solid var(--bstrong);border-radius:2px;padding:7px 9px;text-transform:none;letter-spacing:0}
+.clsok{border-left:3px solid var(--ok);padding:10px 0 10px 14px;margin-top:4px}
+.docitems{display:flex;flex-direction:column;border-top:1px solid var(--border)}
+.docitem{text-align:left;background:transparent;border:0;border-bottom:1px solid var(--border);padding:14px 2px;cursor:pointer;width:100%;font-family:inherit;color:inherit;display:flex;flex-direction:column;gap:6px}
+.docitem:hover{background:var(--surface)}
+.docitem-h{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.docitem-t{font-weight:600;font-size:15px;color:var(--text)}
+.docitem-r{font-size:14px;color:var(--t2);line-height:1.55;max-width:84ch}
+.docitem-d{font-family:var(--mono);font-size:11px;color:var(--muted)}
 
 /* ===== botões ===== */
 .btn{background:var(--accent);color:#fff;border:0;padding:10px 16px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border-radius:2px}
@@ -360,7 +377,7 @@ function projScore(p){var a=DADOS.sinaisA.filter(function(s){return s.projeto_id
 function projsOrdenados(){return DADOS.projetos.slice().sort(function(a,b){return projScore(b)-projScore(a);});}
 
 /* navegação (sidebar) */
-var PJSCREENS=[{k:"dashboard",nome:"Dashboard"},{k:"conversa",nome:"Conversa"},{k:"playbook",nome:"Playbook"},{k:"demandas",nome:"Demandas"}];
+var PJSCREENS=[{k:"dashboard",nome:"Dashboard"},{k:"conversa",nome:"Conversa"},{k:"playbook",nome:"Playbook"},{k:"documentos",nome:"Documentos"},{k:"demandas",nome:"Demandas"}];
 function screenNome(k){var s=PJSCREENS.filter(function(x){return x.k===k;})[0];return s?s.nome:"";}
 function renderNav(){
   var h='<div class="navg solo"><ul><li><span class="navl'+(ESTADO.view==="geral"?" on":"")+'" onclick="navegar(\'geral\')">Visão geral</span></li></ul></div>';
@@ -379,7 +396,7 @@ async function carregarProjeto(pid){
   var F=await sb.from("v_funil_etapa").select("*").eq("projeto_id",pid);
   var C=await sb.from("v_coorte").select("*").eq("projeto_id",pid);
   var G=await sb.from("v_ganhos").select("*").eq("projeto_id",pid);
-  var D=await sb.from("documentos").select("id,titulo,criado_em,tipo").eq("projeto_id",pid).order("criado_em",{ascending:false});
+  var D=await sb.from("documentos").select("id,titulo,criado_em,tipo,resumo,modelo,origem").eq("projeto_id",pid).order("criado_em",{ascending:false});
   var RG=await sb.from("regras_projeto").select("*").eq("projeto_id",pid).order("criado_em");
   var CV=await sb.from("conversas").select("papel,conteudo").eq("projeto_id",pid).order("criado_em");
   var DS=await sb.from("dossie_secoes").select("*").eq("projeto_id",pid).order("ordem");
@@ -448,7 +465,7 @@ function semDossie(p,oque){return '<div class="sec" style="border-bottom:0"><p c
 
 function renderProjeto(){
   var p=proj();if(!p){navegar("geral");return;}var c=CACHE[p.id]||{};var v=ESTADO.pjview||"dashboard";
-  var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
+  var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="documentos"?renderDocumentos(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
   el("main").innerHTML=body;if(v==="conversa")renderChat();else if(v==="dashboard")montarFunil(p.id);
 }
 
@@ -652,7 +669,46 @@ function tabRegras(p,c){var h='<p class="sub" style="margin-bottom:14px">O que t
   h+='<div class="regraform"><textarea id="novaregra" placeholder="Ex.: ganho = contrato assinado; cobrança é outro time."></textarea><div style="margin-top:10px"><button class="btn sm" data-pid="'+p.id+'" onclick="addRegra(this)">Adicionar regra</button></div></div>';return h;}
 async function addRegra(btn){var txt=el("novaregra").value.trim();if(txt.length<4)return;btn.disabled=true;btn.textContent="Salvando...";var r=await sb.from("regras_projeto").insert({projeto_id:btn.dataset.pid,regra:txt,criado_por:window.UID});if(r.error){btn.disabled=false;btn.textContent="Adicionar regra";alert("Erro: "+r.error.message);return;}delete CACHE[btn.dataset.pid];await carregarProjeto(btn.dataset.pid);render();}
 async function delRegra(span){if(!confirm("Remover esta regra?"))return;var r=await sb.from("regras_projeto").delete().eq("id",span.dataset.id);if(r.error){alert("Erro: "+r.error.message);return;}delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();}
-function tabDocs(p,c){if(!(c.docs||[]).length)return '<p class="vazio">Nenhum material gerado ainda. Use os botões acima.</p>';var h='<div class="doclist">';c.docs.forEach(function(d){h+='<span class="doclink" data-id="'+d.id+'" onclick="verDoc(this)"><span>'+esc(d.titulo)+'</span><span class="dt">'+esc(d.tipo||"doc")+'</span></span>';});return h+'</div>';}
+var CLSTIPOS=["ata","material","proposta","contrato","planilha","outro"];
+var TIPOBADGE={ata:"ata",material:"material",proposta:"proposta",contrato:"contrato",planilha:"planilha",pauta:"pauta",war_room:"war room",kit_abordagem:"kit",estrategia:"estratégia",outro:"outro"};
+var ORIGENS=[["upload","Upload"],["whatsapp","WhatsApp"],["drive","Google Drive"],["email","E-mail"],["outro","Outro"]];
+function tabDocs(p,c){var ger=(c.docs||[]).filter(function(d){return CLSTIPOS.indexOf(d.tipo)<0;});if(!ger.length)return '<p class="vazio">Nenhum material gerado ainda. Use os botões acima.</p>';var h='<div class="doclist">';ger.forEach(function(d){h+='<span class="doclink" data-id="'+d.id+'" onclick="verDoc(this)"><span>'+esc(d.titulo)+'</span><span class="dt">'+esc(TIPOBADGE[d.tipo]||d.tipo||"doc")+'</span></span>';});return h+'</div>';}
+/* TELA: Documentos — doc solto do cliente ganha casa (classificar-doc, Haiku) */
+function renderDocumentos(p,c){
+  var h=pageHead(p.nome,"Documentos","Jogue aqui qualquer documento solto do cliente — ata de reunião, material, proposta, planilha. O consultor lê, identifica o tipo e arquiva no lugar certo.");
+  h+='<div class="sec"><div class="sec-h"><h2>Arquivar um documento</h2><span class="src">a IA lê e dá casa</span></div>';
+  h+='<div class="clsbox">';
+  h+='<input id="docnome" class="fld2" placeholder="Nome do arquivo (opcional)">';
+  h+='<textarea id="doctexto" class="clsta" placeholder="Cole aqui o conteúdo do documento (abra o arquivo e copie o texto)…"></textarea>';
+  h+='<div class="clsrow"><label class="clslbl">Origem<select id="docorigem" class="fsel">'+ORIGENS.map(function(o){return '<option value="'+o[0]+'">'+o[1]+'</option>';}).join('')+'</select></label>';
+  h+='<button class="btn" data-slug="'+esc(p.slug)+'" onclick="classificarDoc(this)">Classificar e arquivar</button></div>';
+  h+='<div id="clsresult"></div></div></div>';
+  var docs=(c.docs||[]).filter(function(d){return CLSTIPOS.indexOf(d.tipo)>=0;});
+  h+='<div class="sec"><div class="sec-h"><h2>Arquivados'+(docs.length?" · "+docs.length:"")+'</h2><span class="src">mais recentes primeiro</span></div>';
+  if(!docs.length){h+='<p class="vazio">Nenhum documento arquivado ainda. Cole o primeiro acima.</p>';}
+  else{h+='<div class="docitems">';docs.forEach(function(d){
+    h+='<button class="docitem" data-id="'+d.id+'" onclick="verDoc(this)"><div class="docitem-h"><span class="docitem-t">'+esc(d.titulo)+'</span><span class="chip info">'+esc(TIPOBADGE[d.tipo]||d.tipo||"doc")+'</span></div>';
+    if(d.resumo)h+='<div class="docitem-r">'+esc(d.resumo)+'</div>';
+    if(d.modelo)h+='<div class="docitem-d">↳ '+esc(d.modelo)+'</div>';
+    h+='</button>';
+  });h+='</div>';}
+  return h+'</div>';
+}
+async function classificarDoc(btn){
+  var slug=btn.dataset.slug,t0=btn.textContent;
+  var ta=el("doctexto"),nm=el("docnome"),og=el("docorigem");
+  var texto=((ta&&ta.value)||"").trim();
+  var res=el("clsresult");
+  if(texto.length<20){if(res)res.innerHTML='<p class="vazio">Cole o conteúdo do documento (texto muito curto).</p>';return;}
+  btn.disabled=true;btn.textContent="Classificando…";if(res)res.innerHTML='<p class="src">Lendo e arquivando…</p>';
+  try{
+    var r=await sb.functions.invoke("classificar-doc",{body:{projeto:slug,texto:texto,nome:((nm&&nm.value)||"").trim(),origem:(og&&og.value)||"upload"}});
+    var err=(r.data&&r.data.error)||(r.error&&r.error.message);
+    if(err||!r.data||!r.data.ok){if(res)res.innerHTML='<p class="vazio">Não consegui: '+esc(err||"erro")+'</p>';btn.disabled=false;btn.textContent=t0;return;}
+    if(ta)ta.value="";if(nm)nm.value="";
+    delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();
+  }catch(e){if(res)res.innerHTML='<p class="vazio">Falha: '+esc(String(e&&e.message||e))+'</p>';btn.disabled=false;btn.textContent=t0;}
+}
 function tabAvisos(p){return buildAvisos(DADOS.recsOpen.filter(function(r){return r.projeto_id===p.id;}),DADOS.sinaisA.filter(function(s){return s.projeto_id===p.id;}),DADOS.metricas.filter(function(m){return m.projeto_id===p.id;}),(DADOS.alertaGanho||[]).filter(function(g){return g.projeto_id===p.id;}),[p]);}
 
 /* documentos (overlay) */
