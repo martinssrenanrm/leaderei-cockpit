@@ -270,6 +270,12 @@ table.tbl td:first-child{color:var(--text);font-weight:600}
 .chatinput{display:flex;gap:10px;padding:12px;border-top:1px solid var(--border)}
 .chatinput textarea{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:11px;font-size:14.5px;font-family:inherit;resize:none;height:58px;border-radius:2px}
 .chatinput textarea:focus{outline:none;border-color:var(--accent)}
+.anexochip{padding:0 12px 6px}
+.anx{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);opacity:.85;background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:4px 10px}
+.anx.err{color:#c0392b;opacity:1}
+.anx .del{cursor:pointer;opacity:.6;font-weight:700}
+.anx .del:hover{opacity:1}
+.clip{align-self:flex-end;height:58px;display:inline-flex;align-items:center;font-size:18px}
 
 /* ===== overlay documento ===== */
 .docov{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:flex-start;justify-content:center;overflow:auto;z-index:60;padding:28px 16px}
@@ -771,7 +777,7 @@ function renderConversa(p,c){
   var acao='<button class="btn sm" onclick="pedirEstrategia()">Estratégia (Opus)</button>';
   var h=pageHead(p.nome,"Conversa com o consultor","",acao);
   h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
-  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div class="chatinput"><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'…" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
+  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,text/*,application/pdf" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo (texto ou PDF)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'…" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
 }
 
@@ -834,12 +840,26 @@ function renderChat(){var c=CACHE[ESTADO.pid]||{};var msgs=c.conversa||[];var bo
   if(!msgs.length){box.innerHTML='<div class="chatempty">Converse com o consultor do '+esc(proj().nome)+'. Ele conhece os números e as regras deste projeto.<div class="sugs">'+SUGESTOES.map(function(s){return '<button class="sug" onclick="usarSugestao(this)">'+esc(s)+'</button>';}).join('')+'</div></div>';}
   else{var h='';msgs.forEach(function(m){h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+(m.papel==="assistant"?mdRender(m.conteudo):esc(m.conteudo))+'</div>';});box.innerHTML=h;}
   box.scrollTop=box.scrollHeight;}
-async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt)return;
+var ANEXO=null;
+function removerAnexo(){ANEXO=null;var chip=el("anexochip");if(chip)chip.innerHTML="";}
+function carregarPdfJs(){return new Promise(function(res,rej){if(window.pdfjsLib){res();return;}var s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=function(){try{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}catch(e){}res();};s.onerror=function(){rej(new Error("não consegui carregar o leitor de PDF"));};document.head.appendChild(s);});}
+async function lerPdf(f){await carregarPdfJs();var buf=await f.arrayBuffer();var pdf=await window.pdfjsLib.getDocument({data:buf}).promise;var out="";for(var i=1;i<=pdf.numPages;i++){var pg=await pdf.getPage(i);var tc=await pg.getTextContent();out+=tc.items.map(function(it){return it.str;}).join(" ")+"\n";if(out.length>16000)break;}return out;}
+function lerArquivo(f){var nome=(f.name||"").toLowerCase();if(nome.endsWith(".pdf")||f.type==="application/pdf")return lerPdf(f);return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||""));};r.onerror=function(){rej(new Error("erro de leitura"));};r.readAsText(f);});}
+async function anexarArquivo(inp){var f=inp.files&&inp.files[0];inp.value="";if(!f)return;var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Lendo '+esc(f.name)+'…</span>';
+  try{var txt=((await lerArquivo(f))||"").trim();
+    if(txt.length<2){if(chip)chip.innerHTML='<span class="anx err">Não achei texto em '+esc(f.name)+'. Se for PDF escaneado (imagem), converta para texto ou cole o conteúdo.<span class="del" onclick="removerAnexo()">✕</span></span>';return;}
+    var cortado=txt.length>14000;if(cortado)txt=txt.slice(0,14000);
+    ANEXO={nome:f.name,texto:txt};
+    if(chip)chip.innerHTML='<span class="anx">📎 '+esc(f.name)+' · '+txt.length+' caracteres'+(cortado?' (cortado)':'')+'<span class="del" onclick="removerAnexo()">✕</span></span>';
+  }catch(e){if(chip)chip.innerHTML='<span class="anx err">Falha ao ler: '+esc(String(e&&e.message||e))+'<span class="del" onclick="removerAnexo()">✕</span></span>';}}
+async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt&&!ANEXO)return;
   var pid=ESTADO.pid,c=CACHE[pid]||(CACHE[pid]={});if(!c.conversa)c.conversa=[];
-  c.conversa.push({papel:"user",conteudo:txt});inp.value="";renderChat();
+  var anx=ANEXO;
+  c.conversa.push({papel:"user",conteudo:(txt||"Leia o arquivo anexado.")+(anx?("\n\n📎 "+anx.nome):"")});inp.value="";removerAnexo();renderChat();
   var btn=el("enviarbtn");btn.disabled=true;btn.textContent="…";
   var slug=proj().slug;
-  try{var r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:txt}});
+  var mensagem=anx?('Documento anexado pelo usuário — "'+anx.nome+'":\n"""\n'+anx.texto+'\n"""\n\n'+(txt||"Leia este documento e me diga o que é importante para a consultoria deste cliente.")):txt;
+  try{var r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:mensagem}});
     var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     c.conversa.push({papel:"assistant",conteudo:(err||!r.data||!r.data.resposta)?("(erro: "+(err||"não respondeu")+")"):r.data.resposta});
   }catch(e){c.conversa.push({papel:"assistant",conteudo:"(falha: "+String(e&&e.message||e)+")"});}
