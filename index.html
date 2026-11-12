@@ -820,6 +820,10 @@ function renderDemandas(p,c){
   h+='<textarea id="wata" class="clsta" placeholder="Cole a ata / transcrição da reunião'+(atas.length?" (ou escolha uma arquivada acima)":"")+'…"></textarea>';
   h+='<div class="clsrow"><button class="btn" data-slug="'+esc(p.slug)+'" onclick="draftarWhats(this)">Rascunhar recado</button></div>';
   h+='<div id="waresult"></div></div></div>';
+  h+='<div class="sec"><div class="sec-h"><h2>Reporte do dia</h2><span class="src">rascunho — você revisa e envia</span></div><div class="clsbox">';
+  h+='<textarea id="rpfatos" class="clsta" placeholder="O que rolou hoje: atividades, reuniões, agendamentos, resultados… (correlaciono com as metas do projeto)"></textarea>';
+  h+='<div class="clsrow"><button class="btn" data-slug="'+esc(p.slug)+'" onclick="draftarReporte(this)">Rascunhar reporte</button></div>';
+  h+='<div id="rpresult"></div></div></div>';
   h+='<div class="sec"><div class="sec-h"><h2>Ações'+(acN?" · "+acN:"")+'</h2><span class="src">aprovar · feito · descartar</span></div>'+tabAcoes(p)+'</div>';
   h+='<div class="sec"><div class="sec-h"><h2>Avisos</h2></div>'+tabAvisos(p)+'</div>';
   return h;
@@ -844,18 +848,27 @@ var SUGESTOES=["Criar um gráfico","Fazer uma ação em massa no CRM","Tenho uma
 function usarSugestao(b){var inp=el("chatin");if(!inp)return;inp.value=b.textContent;enviar();}
 function pedirEstrategia(){var inp=el("chatin");if(!inp)return;inp.value="Monte a estratégia comercial completa deste projeto: diagnóstico do funil e gargalo, prioridades, plano de ação por função (pré-vendas/closer/gestão) e metas.";enviar();}
 function whatsAcao(b){window.open("https://wa.me/?text="+encodeURIComponent(b.dataset.msg||""),"_blank");}
-/* recado pós-reunião: rascunho (Haiku) na estrutura padrão — Renan revisa e envia */
-async function carregarAta(sel){var id=sel.value,ta=el("wata");if(!ta)return;if(!id)return;ta.value="carregando…";var r=await sb.from("documentos").select("conteudo").eq("id",id).single();ta.value=r.error?"":((r.data&&r.data.conteudo)||"");}
+/* recados pro grupo do cliente: rascunho (Haiku) — Renan revisa e envia */
+async function carregarAta(sel){var id=sel.value,ta=el("wata");if(!ta||!id)return;ta.value="carregando…";var r=await sb.from("documentos").select("conteudo").eq("id",id).single();ta.value=r.error?"":((r.data&&r.data.conteudo)||"");}
+function waSaida(res,texto,id){res.innerHTML='<textarea id="'+id+'" class="clsta"></textarea><div class="clsrow"><button class="btn sm" onclick="copiarWhats(\''+id+'\',this)">Copiar</button><button class="btn sm ghost" onclick="abrirWhats(\''+id+'\')">Abrir no WhatsApp</button></div><p class="src">Revise e ajuste antes de enviar. Quem envia é você, no grupo do cliente.</p>';el(id).value=texto;}
 async function draftarWhats(btn){var slug=btn.dataset.slug,t0=btn.textContent,ta=el("wata"),res=el("waresult");var texto=((ta&&ta.value)||"").trim();
   if(texto.length<40){if(res)res.innerHTML='<p class="vazio">Cole a ata da reunião (texto muito curto).</p>';return;}
   btn.disabled=true;btn.textContent="Rascunhando…";if(res)res.innerHTML='<p class="src">Montando o recado…</p>';
   try{var r=await sb.functions.invoke("draftar-whatsapp",{body:{projeto:slug,texto:texto}});var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     if(err||!r.data||!r.data.rascunho){if(res)res.innerHTML='<p class="vazio">Não consegui: '+esc(err||"erro")+'</p>';}
-    else{res.innerHTML='<textarea id="wadraft" class="clsta"></textarea><div class="clsrow"><button class="btn sm" onclick="copiarWhats(this)">Copiar</button><button class="btn sm ghost" onclick="abrirWhats()">Abrir no WhatsApp</button></div><p class="src">Revise e ajuste antes de enviar. Quem envia é você, no grupo do cliente.</p>';el("wadraft").value=r.data.rascunho;}
+    else waSaida(res,r.data.rascunho,"wadraft");
   }catch(e){if(res)res.innerHTML='<p class="vazio">Falha: '+esc(String(e&&e.message||e))+'</p>';}
   btn.disabled=false;btn.textContent=t0;}
-function copiarWhats(b){var t=el("wadraft");if(!t)return;t.select();try{navigator.clipboard.writeText(t.value);}catch(e){try{document.execCommand("copy");}catch(_){}}if(b){var o=b.textContent;b.textContent="Copiado ✓";setTimeout(function(){b.textContent=o;},1500);}}
-function abrirWhats(){var t=el("wadraft");if(!t)return;window.open("https://wa.me/?text="+encodeURIComponent(t.value),"_blank");}
+async function draftarReporte(btn){var slug=btn.dataset.slug,t0=btn.textContent,ta=el("rpfatos"),res=el("rpresult");var fatos=((ta&&ta.value)||"").trim();
+  if(fatos.length<15){if(res)res.innerHTML='<p class="vazio">Escreva o que rolou hoje (texto muito curto).</p>';return;}
+  btn.disabled=true;btn.textContent="Rascunhando…";if(res)res.innerHTML='<p class="src">Montando o reporte…</p>';
+  try{var r=await sb.functions.invoke("reporte-diario",{body:{projeto:slug,fatos:fatos}});var err=(r.data&&r.data.error)||(r.error&&r.error.message);
+    if(err||!r.data||!r.data.rascunho){if(res)res.innerHTML='<p class="vazio">Não consegui: '+esc(err||"erro")+'</p>';}
+    else waSaida(res,r.data.rascunho,"rpdraft");
+  }catch(e){if(res)res.innerHTML='<p class="vazio">Falha: '+esc(String(e&&e.message||e))+'</p>';}
+  btn.disabled=false;btn.textContent=t0;}
+function copiarWhats(id,b){var t=el(id);if(!t)return;t.select();try{navigator.clipboard.writeText(t.value);}catch(e){try{document.execCommand("copy");}catch(_){}}if(b){var o=b.textContent;b.textContent="Copiado ✓";setTimeout(function(){b.textContent=o;},1500);}}
+function abrirWhats(id){var t=el(id);if(!t)return;window.open("https://wa.me/?text="+encodeURIComponent(t.value),"_blank");}
 
 /* dossiê */
 async function reconstruirDossie(btn){var slug=btn.dataset.slug,t0=btn.textContent;btn.disabled=true;btn.textContent="Lendo reuniões (~1min)…";
