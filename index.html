@@ -521,7 +521,7 @@ function projsOrdenados(){return DADOS.projetos.slice().sort(function(a,b){retur
 
 /* navegação (sidebar) */
 var PJSCREENS=[{k:"dashboard",nome:"Dashboard"},{k:"conversa",nome:"Conversa"},{k:"playbook",nome:"Playbook"},{k:"documentos",nome:"Documentos"},{k:"demandas",nome:"Demandas"}];
-function screenNome(k){var s=PJSCREENS.filter(function(x){return x.k===k;})[0];return s?s.nome:"";}
+function screenNome(k){if(k==="metas")return "Metas";var s=PJSCREENS.filter(function(x){return x.k===k;})[0];return s?s.nome:"";}
 function renderNav(){
   var h='<div class="navg solo"><ul><li><span class="navl'+(ESTADO.view==="geral"?" on":"")+'" onclick="navegar(\'geral\')">Visão geral</span></li></ul></div>';
   h+='<div class="navg"><div class="navg-h">Projetos</div><ul>';
@@ -544,7 +544,8 @@ async function carregarProjeto(pid){
   var CV=await sb.from("conversas").select("papel,conteudo").eq("projeto_id",pid).order("criado_em");
   var DS=await sb.from("dossie_secoes").select("*").eq("projeto_id",pid).order("ordem");
   var PL=await sb.from("v_funil_pipelines").select("*").eq("projeto_id",pid);
-  CACHE[pid]={funil:F.data||[],coorte:C.data||[],ganhos:G.data||[],docs:D.data||[],regras:RG.data||[],conversa:CV.data||[],dossie:DS.data||[],pipelines:PL.data||[]};
+  var MT=await sb.from("metas").select("*").eq("projeto_id",pid).order("ordem");
+  CACHE[pid]={funil:F.data||[],coorte:C.data||[],ganhos:G.data||[],docs:D.data||[],regras:RG.data||[],conversa:CV.data||[],dossie:DS.data||[],pipelines:PL.data||[],metas:MT.data||[]};
 }
 function render(){renderNav();setCrumb();if(ESTADO.view==="geral")renderGeral();else renderProjeto();}
 
@@ -608,7 +609,7 @@ function semDossie(p,oque){return '<div class="sec" style="border-bottom:0"><p c
 
 function renderProjeto(){
   var p=proj();if(!p){navegar("geral");return;}var c=CACHE[p.id]||{};var v=ESTADO.pjview||"dashboard";
-  var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="documentos"?renderDocumentos(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
+  var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="documentos"?renderDocumentos(p,c):v==="metas"?renderMetas(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
   el("main").innerHTML=body;if(v==="conversa")renderChat();else if(v==="dashboard"){montarFunil(p.id);montarVigia(p.id);}
 }
 
@@ -626,7 +627,7 @@ function renderDashboard(p,c){
   var reun=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("reuni")===0;})[0];
   var toques=mP.filter(function(m){return m.periodo&&m.periodo.indexOf("toques")===0&&m.contatos!=null;});
   var totToq=toques.reduce(function(s,m){return s+(m.contatos||0);},0);
-  var h=pageHead(p.nome,"Dashboard","Os números do projeto num olhar.");
+  var h=pageHead(p.nome,"Dashboard","Os números do projeto num olhar.",'<button class="btn sm" onclick="setPjView(\'metas\')">Metas</button>');
   if(!resumo&&!toques.length){h+='<div class="sec"><p class="vazio">Sem métricas sincronizadas ainda. O sync do Pipedrive popula este painel.</p></div>';h+=funilSec(p,c);h+=vigiaSec(p,c);h+=warRoomSec(p,c);return h;}
   h+='<div class="facts">';
   h+='<div class="fact"><div class="big a">'+(resumo?fmtInt(resumo.fechamentos):"—")+'</div><div class="lb">ganhos</div></div>';
@@ -734,6 +735,36 @@ async function montarVigia(pid){
   if(r.error){box.innerHTML='<p class="vazio">Não consegui ler o funil agora.</p>';return;}
   box.innerHTML=vigiaHTML(r.data||{});
 }
+
+/* TELA: Metas — KPIs e alvos do time (editável pelo time Leaderei) */
+var FUNCOES=[["geral","Geral"],["prevendas","Pré-vendas"],["closer","Closer"],["gestao","Gestão"]];
+function renderMetas(p,c){
+  var ms=(c.metas||[]);
+  var h=pageHead(p.nome,"Metas","As métricas de sucesso do time e os números a atingir — pra todos ficarem 100% alinhados do que é esperado.",'<button class="btn sm ghost" onclick="setPjView(\'dashboard\')">← Dashboard</button>');
+  var grupos={};ms.forEach(function(m){var f=m.funcao||"geral";(grupos[f]=grupos[f]||[]).push(m);});
+  FUNCOES.forEach(function(f){
+    var arr=grupos[f[0]]||[];if(!arr.length)return;
+    arr.sort(function(a,b){return (a.ordem||0)-(b.ordem||0);});
+    h+='<div class="sec"><div class="sec-h"><h2>'+esc(f[1])+'</h2><span class="src">'+arr.length+' indicador'+(arr.length>1?"es":"")+'</span></div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>KPI</th><th>Alvo</th><th>Período</th><th></th></tr></thead><tbody>';
+    arr.forEach(function(m){h+='<tr><td>'+esc(m.kpi)+'</td><td class="num">'+esc((m.alvo||"—")+(m.unidade?" "+m.unidade:""))+'</td><td>'+esc(m.periodo||"—")+'</td><td style="text-align:right"><span class="del" data-id="'+m.id+'" onclick="delMeta(this)" style="cursor:pointer;color:var(--muted)">✕</span></td></tr>';});
+    h+='</tbody></table></div></div>';
+  });
+  if(!ms.length)h+='<div class="sec"><p class="vazio">Nenhuma meta definida ainda. Adicione abaixo o que o time precisa atingir — por função.</p></div>';
+  h+='<div class="sec" style="border-bottom:0"><div class="sec-h"><h2>Adicionar meta</h2><span class="src">o time Leaderei define</span></div><div class="clsbox">';
+  h+='<div class="clsrow"><label class="clslbl">Função<select id="mfuncao" class="fsel">'+FUNCOES.map(function(x){return '<option value="'+x[0]+'">'+x[1]+'</option>';}).join('')+'</select></label>';
+  h+='<label class="clslbl">Período<input id="mperiodo" class="fld2" placeholder="mês" style="max-width:150px"></label></div>';
+  h+='<input id="mkpi" class="fld2" placeholder="KPI (ex.: Reuniões agendadas · Taxa de conversão proposta→venda)">';
+  h+='<div class="clsrow"><label class="clslbl">Alvo<input id="malvo" class="fld2" placeholder="30" style="max-width:130px"></label>';
+  h+='<label class="clslbl">Unidade<input id="munidade" class="fld2" placeholder="un / % / R$" style="max-width:130px"></label>';
+  h+='<button class="btn" data-pid="'+p.id+'" onclick="addMeta(this)">Adicionar meta</button></div>';
+  h+='</div></div>';
+  return h;
+}
+async function addMeta(btn){var k=el("mkpi");if(!k||k.value.trim().length<2)return;btn.disabled=true;btn.textContent="Salvando...";
+  var r=await sb.from("metas").insert({projeto_id:btn.dataset.pid,funcao:el("mfuncao").value,kpi:k.value.trim(),alvo:(el("malvo").value||"").trim()||null,unidade:(el("munidade").value||"").trim()||null,periodo:(el("mperiodo").value||"").trim()||null,atualizado_por:window.UID});
+  if(r.error){btn.disabled=false;btn.textContent="Adicionar meta";alert("Erro: "+r.error.message);return;}
+  delete CACHE[btn.dataset.pid];await carregarProjeto(btn.dataset.pid);render();}
+async function delMeta(span){if(!confirm("Remover esta meta?"))return;var r=await sb.from("metas").delete().eq("id",span.dataset.id);if(r.error){alert("Erro: "+r.error.message);return;}delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();}
 
 /* TELA: Conversa — o centro */
 function renderConversa(p,c){
