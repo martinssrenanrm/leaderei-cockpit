@@ -777,7 +777,7 @@ function renderConversa(p,c){
   var acao='<button class="btn sm" onclick="pedirEstrategia()">Estratégia (Opus)</button>';
   var h=pageHead(p.nome,"Conversa com o consultor","",acao);
   h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
-  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,text/*,application/pdf" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo (texto ou PDF)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'…" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
+  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/*,application/pdf,image/*" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo ou imagem (ou cole com Ctrl+V)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'… (pode colar imagem com Ctrl+V)" onpaste="colarImagem(event)" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
 }
 
@@ -838,28 +838,35 @@ function renderDemandas(p,c){
 /* chat */
 function renderChat(){var c=CACHE[ESTADO.pid]||{};var msgs=c.conversa||[];var box=el("chatmsgs");if(!box)return;
   if(!msgs.length){box.innerHTML='<div class="chatempty">Converse com o consultor do '+esc(proj().nome)+'. Ele conhece os números e as regras deste projeto.<div class="sugs">'+SUGESTOES.map(function(s){return '<button class="sug" onclick="usarSugestao(this)">'+esc(s)+'</button>';}).join('')+'</div></div>';}
-  else{var h='';msgs.forEach(function(m){h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+(m.papel==="assistant"?mdRender(m.conteudo):esc(m.conteudo))+'</div>';});box.innerHTML=h;}
+  else{var h='';msgs.forEach(function(m){var inner;if(m.papel==="assistant"){inner=mdRender(m.conteudo);}else{inner=(m.img?'<img src="'+m.img+'" style="max-width:220px;max-height:220px;border-radius:8px;display:block;margin-bottom:6px">':'')+(m.arq?'<div class="src" style="margin-bottom:4px">📎 '+esc(m.arq)+'</div>':'')+esc(m.conteudo);}h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+inner+'</div>';});box.innerHTML=h;}
   box.scrollTop=box.scrollHeight;}
 var ANEXO=null;
 function removerAnexo(){ANEXO=null;var chip=el("anexochip");if(chip)chip.innerHTML="";}
+function chipErro(t){var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx err">'+esc(t)+'<span class="del" onclick="removerAnexo()">✕</span></span>';}
 function carregarPdfJs(){return new Promise(function(res,rej){if(window.pdfjsLib){res();return;}var s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=function(){try{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}catch(e){}res();};s.onerror=function(){rej(new Error("não consegui carregar o leitor de PDF"));};document.head.appendChild(s);});}
 async function lerPdf(f){await carregarPdfJs();var buf=await f.arrayBuffer();var pdf=await window.pdfjsLib.getDocument({data:buf}).promise;var out="";for(var i=1;i<=pdf.numPages;i++){var pg=await pdf.getPage(i);var tc=await pg.getTextContent();out+=tc.items.map(function(it){return it.str;}).join(" ")+"\n";if(out.length>16000)break;}return out;}
-function lerArquivo(f){var nome=(f.name||"").toLowerCase();if(nome.endsWith(".pdf")||f.type==="application/pdf")return lerPdf(f);return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||""));};r.onerror=function(){rej(new Error("erro de leitura"));};r.readAsText(f);});}
-async function anexarArquivo(inp){var f=inp.files&&inp.files[0];inp.value="";if(!f)return;var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Lendo '+esc(f.name)+'…</span>';
-  try{var txt=((await lerArquivo(f))||"").trim();
-    if(txt.length<2){if(chip)chip.innerHTML='<span class="anx err">Não achei texto em '+esc(f.name)+'. Se for PDF escaneado (imagem), converta para texto ou cole o conteúdo.<span class="del" onclick="removerAnexo()">✕</span></span>';return;}
+function lerArquivoTexto(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||""));};r.onerror=function(){rej(new Error("erro de leitura"));};r.readAsText(f);});}
+function lerImagem(f){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){var im=new Image();im.onload=function(){var mx=1568,w=im.width,hh=im.height;if(w>mx||hh>mx){var k=Math.min(mx/w,mx/hh);w=Math.round(w*k);hh=Math.round(hh*k);}var cv=document.createElement("canvas");cv.width=w;cv.height=hh;cv.getContext("2d").drawImage(im,0,0,w,hh);var durl=cv.toDataURL("image/jpeg",0.85);res({media_type:"image/jpeg",data:durl.split(",")[1],thumb:durl});};im.onerror=function(){rej(new Error("imagem inválida"));};im.src=String(fr.result||"");};fr.onerror=function(){rej(new Error("erro de leitura"));};fr.readAsDataURL(f);});}
+async function processarImagem(f){var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Processando imagem…</span>';try{var im=await lerImagem(f);ANEXO={kind:"imagem",media_type:im.media_type,data:im.data,thumb:im.thumb};if(chip)chip.innerHTML='<span class="anx"><img src="'+im.thumb+'" style="height:34px;width:auto;border-radius:4px">imagem pronta — escreva e envie<span class="del" onclick="removerAnexo()">✕</span></span>';}catch(e){chipErro("Falha na imagem: "+String(e&&e.message||e));}}
+async function anexarArquivo(inp){var f=inp.files&&inp.files[0];inp.value="";if(!f)return;if((f.type||"").indexOf("image/")===0)return processarImagem(f);var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Lendo '+esc(f.name)+'…</span>';
+  try{var nome=(f.name||"").toLowerCase();var txt=(((nome.endsWith(".pdf")||f.type==="application/pdf")?await lerPdf(f):await lerArquivoTexto(f))||"").trim();
+    if(txt.length<2){chipErro("Não achei texto em "+f.name+". Se for PDF escaneado, cole como imagem (Ctrl+V) ou cole o texto.");return;}
     var cortado=txt.length>14000;if(cortado)txt=txt.slice(0,14000);
-    ANEXO={nome:f.name,texto:txt};
+    ANEXO={kind:"texto",nome:f.name,texto:txt};
     if(chip)chip.innerHTML='<span class="anx">📎 '+esc(f.name)+' · '+txt.length+' caracteres'+(cortado?' (cortado)':'')+'<span class="del" onclick="removerAnexo()">✕</span></span>';
-  }catch(e){if(chip)chip.innerHTML='<span class="anx err">Falha ao ler: '+esc(String(e&&e.message||e))+'<span class="del" onclick="removerAnexo()">✕</span></span>';}}
+  }catch(e){chipErro("Falha ao ler: "+String(e&&e.message||e));}}
+function colarImagem(e){var items=(e.clipboardData&&e.clipboardData.items)||[];for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image/")===0){var f=items[i].getAsFile();if(f){e.preventDefault();processarImagem(f);return;}}}}
 async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt&&!ANEXO)return;
   var pid=ESTADO.pid,c=CACHE[pid]||(CACHE[pid]={});if(!c.conversa)c.conversa=[];
-  var anx=ANEXO;
-  c.conversa.push({papel:"user",conteudo:(txt||"Leia o arquivo anexado.")+(anx?("\n\n📎 "+anx.nome):"")});inp.value="";removerAnexo();renderChat();
+  var anx=ANEXO,ehImg=anx&&anx.kind==="imagem";
+  var histTxt=(c.conversa||[]).slice(-6).map(function(m){return (m.papel==="assistant"?"Consultor":"Você")+": "+String(m.conteudo||"").replace(/\n+/g," ").slice(0,400);}).join("\n");
+  c.conversa.push({papel:"user",conteudo:(txt||(ehImg?"(imagem)":"Leia o arquivo anexado.")),img:(ehImg?anx.thumb:null),arq:(anx&&anx.kind==="texto"?anx.nome:null)});
+  inp.value="";removerAnexo();renderChat();
   var btn=el("enviarbtn");btn.disabled=true;btn.textContent="…";
   var slug=proj().slug;
-  var mensagem=anx?('Documento anexado pelo usuário — "'+anx.nome+'":\n"""\n'+anx.texto+'\n"""\n\n'+(txt||"Leia este documento e me diga o que é importante para a consultoria deste cliente.")):txt;
-  try{var r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:mensagem}});
+  try{var r;
+    if(ehImg){r=await sb.functions.invoke("ver-imagem",{body:{projeto:slug,mensagem:txt,contexto:histTxt,imagem:{media_type:anx.media_type,data:anx.data}}});}
+    else{var mensagem=anx?('Documento anexado pelo usuário — "'+anx.nome+'":\n"""\n'+anx.texto+'\n"""\n\n'+(txt||"Leia este documento e me diga o que é importante para a consultoria deste cliente.")):txt;r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:mensagem}});}
     var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     c.conversa.push({papel:"assistant",conteudo:(err||!r.data||!r.data.resposta)?("(erro: "+(err||"não respondeu")+")"):r.data.resposta});
   }catch(e){c.conversa.push({papel:"assistant",conteudo:"(falha: "+String(e&&e.message||e)+")"});}
