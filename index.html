@@ -814,6 +814,12 @@ function renderDemandas(p,c){
   if(dg)h+='<div class="sec"><div class="sec-h"><h2>Diagnóstico</h2><span class="src">dentro / fora do eixo</span></div><div class="prose">'+mdRender(dg.conteudo_md||"")+'</div></div>';
   if(pr)h+='<div class="sec"><div class="now-block"><div class="nk">Próxima reunião — pauta</div><div class="prose">'+mdRender(pr.conteudo_md||"")+'</div></div></div>';
   if(pa)h+='<div class="sec"><div class="sec-h"><h2>Próximas ações</h2><span class="src">por impacto</span></div><div class="prose">'+mdRender(pa.conteudo_md||"")+'</div></div>';
+  var atas=(c.docs||[]).filter(function(d){return d.tipo==="ata";});
+  h+='<div class="sec"><div class="sec-h"><h2>Recado pós-reunião</h2><span class="src">rascunho — você revisa e envia</span></div><div class="clsbox">';
+  if(atas.length)h+='<label class="clslbl">Usar uma ata arquivada <select id="waata" class="fsel" onchange="carregarAta(this)"><option value="">— ou cole abaixo —</option>'+atas.map(function(d){return '<option value="'+d.id+'">'+esc(d.titulo)+'</option>';}).join('')+'</select></label>';
+  h+='<textarea id="wata" class="clsta" placeholder="Cole a ata / transcrição da reunião'+(atas.length?" (ou escolha uma arquivada acima)":"")+'…"></textarea>';
+  h+='<div class="clsrow"><button class="btn" data-slug="'+esc(p.slug)+'" onclick="draftarWhats(this)">Rascunhar recado</button></div>';
+  h+='<div id="waresult"></div></div></div>';
   h+='<div class="sec"><div class="sec-h"><h2>Ações'+(acN?" · "+acN:"")+'</h2><span class="src">aprovar · feito · descartar</span></div>'+tabAcoes(p)+'</div>';
   h+='<div class="sec"><div class="sec-h"><h2>Avisos</h2></div>'+tabAvisos(p)+'</div>';
   return h;
@@ -838,6 +844,18 @@ var SUGESTOES=["Criar um gráfico","Fazer uma ação em massa no CRM","Tenho uma
 function usarSugestao(b){var inp=el("chatin");if(!inp)return;inp.value=b.textContent;enviar();}
 function pedirEstrategia(){var inp=el("chatin");if(!inp)return;inp.value="Monte a estratégia comercial completa deste projeto: diagnóstico do funil e gargalo, prioridades, plano de ação por função (pré-vendas/closer/gestão) e metas.";enviar();}
 function whatsAcao(b){window.open("https://wa.me/?text="+encodeURIComponent(b.dataset.msg||""),"_blank");}
+/* recado pós-reunião: rascunho (Haiku) na estrutura padrão — Renan revisa e envia */
+async function carregarAta(sel){var id=sel.value,ta=el("wata");if(!ta)return;if(!id)return;ta.value="carregando…";var r=await sb.from("documentos").select("conteudo").eq("id",id).single();ta.value=r.error?"":((r.data&&r.data.conteudo)||"");}
+async function draftarWhats(btn){var slug=btn.dataset.slug,t0=btn.textContent,ta=el("wata"),res=el("waresult");var texto=((ta&&ta.value)||"").trim();
+  if(texto.length<40){if(res)res.innerHTML='<p class="vazio">Cole a ata da reunião (texto muito curto).</p>';return;}
+  btn.disabled=true;btn.textContent="Rascunhando…";if(res)res.innerHTML='<p class="src">Montando o recado…</p>';
+  try{var r=await sb.functions.invoke("draftar-whatsapp",{body:{projeto:slug,texto:texto}});var err=(r.data&&r.data.error)||(r.error&&r.error.message);
+    if(err||!r.data||!r.data.rascunho){if(res)res.innerHTML='<p class="vazio">Não consegui: '+esc(err||"erro")+'</p>';}
+    else{res.innerHTML='<textarea id="wadraft" class="clsta"></textarea><div class="clsrow"><button class="btn sm" onclick="copiarWhats(this)">Copiar</button><button class="btn sm ghost" onclick="abrirWhats()">Abrir no WhatsApp</button></div><p class="src">Revise e ajuste antes de enviar. Quem envia é você, no grupo do cliente.</p>';el("wadraft").value=r.data.rascunho;}
+  }catch(e){if(res)res.innerHTML='<p class="vazio">Falha: '+esc(String(e&&e.message||e))+'</p>';}
+  btn.disabled=false;btn.textContent=t0;}
+function copiarWhats(b){var t=el("wadraft");if(!t)return;t.select();try{navigator.clipboard.writeText(t.value);}catch(e){try{document.execCommand("copy");}catch(_){}}if(b){var o=b.textContent;b.textContent="Copiado ✓";setTimeout(function(){b.textContent=o;},1500);}}
+function abrirWhats(){var t=el("wadraft");if(!t)return;window.open("https://wa.me/?text="+encodeURIComponent(t.value),"_blank");}
 
 /* dossiê */
 async function reconstruirDossie(btn){var slug=btn.dataset.slug,t0=btn.textContent;btn.disabled=true;btn.textContent="Lendo reuniões (~1min)…";
