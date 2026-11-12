@@ -470,6 +470,8 @@ var SUPA_URL="https://yoimpltmxtmbhlfgjzoo.supabase.co";
 var SUPA_KEY="sb_publishable_O3hpZ8Umfo7T67S90_mp5A_Sq9Ueth5";
 var store;try{store=window.localStorage;}catch(e){store=undefined;}
 var sb=window.supabase.createClient(SUPA_URL,SUPA_KEY,{auth:{persistSession:!!store,storage:store}});
+/* Garante o JWT do usuário em toda chamada de edge function (senão o invoke manda a chave publishable e a função devolve "Não autenticado"). */
+(function(){var _inv=sb.functions.invoke.bind(sb.functions);sb.functions.invoke=async function(fn,opts){opts=opts||{};try{var s=(await sb.auth.getSession()).data.session;if(s&&s.access_token){opts.headers=Object.assign({Authorization:"Bearer "+s.access_token},opts.headers||{});}}catch(e){}return _inv(fn,opts);};})();
 var LOGO=document.getElementById("LOGO").outerHTML.replace('display:none','');
 var DADOS={},CACHE={},ESTADO={view:"geral",pid:null,pjview:"dashboard",pbsec:null},modo="entrar";
 function el(id){return document.getElementById(id);}
