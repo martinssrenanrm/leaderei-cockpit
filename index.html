@@ -777,7 +777,7 @@ function renderConversa(p,c){
   var acao='<button class="btn sm" onclick="pedirEstrategia()">Estratégia (Opus)</button>';
   var h=pageHead(p.nome,"Conversa com o consultor","",acao);
   h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
-  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/*,application/pdf,image/*" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo ou imagem (ou cole com Ctrl+V)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'… (pode colar imagem com Ctrl+V)" onpaste="colarImagem(event)" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
+  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/*,application/pdf,image/*" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo ou imagem (ou cole com Ctrl+V)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'… (pode colar imagem com Ctrl+V)" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
 }
 
@@ -855,7 +855,8 @@ async function anexarArquivo(inp){var f=inp.files&&inp.files[0];inp.value="";if(
     ANEXO={kind:"texto",nome:f.name,texto:txt};
     if(chip)chip.innerHTML='<span class="anx">📎 '+esc(f.name)+' · '+txt.length+' caracteres'+(cortado?' (cortado)':'')+'<span class="del" onclick="removerAnexo()">✕</span></span>';
   }catch(e){chipErro("Falha ao ler: "+String(e&&e.message||e));}}
-function colarImagem(e){var items=(e.clipboardData&&e.clipboardData.items)||[];for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image/")===0){var f=items[i].getAsFile();if(f){e.preventDefault();processarImagem(f);return;}}}}
+function colarImagem(e){var cd=e.clipboardData||window.clipboardData;if(!cd)return;var items=cd.items||[];for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image/")===0){var f=items[i].getAsFile();if(f){e.preventDefault();processarImagem(f);return;}}}var files=cd.files||[];for(var k=0;k<files.length;k++){if((files[k].type||"").indexOf("image/")===0){e.preventDefault();processarImagem(files[k]);return;}}}
+if(!window.__pasteBound){window.__pasteBound=true;document.addEventListener("paste",function(e){try{if(ESTADO&&ESTADO.view!=="geral"&&ESTADO.pjview==="conversa"&&el("chatin"))colarImagem(e);}catch(_){}});}
 async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt&&!ANEXO)return;
   var pid=ESTADO.pid,c=CACHE[pid]||(CACHE[pid]={});if(!c.conversa)c.conversa=[];
   var anx=ANEXO,ehImg=anx&&anx.kind==="imagem";
