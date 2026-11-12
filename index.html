@@ -512,7 +512,7 @@ async function criarConta(){var e=el("email").value.trim(),p=el("senha").value;i
 async function logout(){await sb.auth.signOut();showLogin();}
 
 /* boot / load */
-async function boot(){var s=(await sb.auth.getSession()).data.session;if(!s){showLogin();return;}el("login").style.display="none";el("app").style.display="grid";el("navlogo").innerHTML=LOGO;el("whoami").textContent=s.user.email;applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"light":"dark");window.UID=s.user.id;await load();}
+async function boot(){var s=(await sb.auth.getSession()).data.session;if(!s){showLogin();return;}window.__booted=true;el("login").style.display="none";el("app").style.display="grid";el("navlogo").innerHTML=LOGO;el("whoami").textContent=s.user.email;applyTheme(document.documentElement.getAttribute("data-theme")==="light"?"light":"dark");window.UID=s.user.id;await load();}
 async function load(){
   var P=await sb.from("projetos").select("*");
   if(P.error){el("main").innerHTML='<p class="sub">Erro ao ler dados: '+esc(P.error.message)+'</p>';return;}
@@ -616,7 +616,7 @@ function semDossie(p,oque){return '<div class="sec" style="border-bottom:0"><p c
 function renderProjeto(){
   var p=proj();if(!p){navegar("geral");return;}var c=CACHE[p.id]||{};var v=ESTADO.pjview||"dashboard";
   var body=v==="conversa"?renderConversa(p,c):v==="playbook"?renderPlaybook(p,c):v==="documentos"?renderDocumentos(p,c):v==="metas"?renderMetas(p,c):v==="abordagem"?renderAbordagem(p,c):v==="demandas"?renderDemandas(p,c):renderDashboard(p,c);
-  el("main").innerHTML=body;if(v==="conversa")renderChat();else if(v==="dashboard"){montarFunil(p.id);montarVigia(p.id);}
+  el("main").innerHTML=body;if(v==="conversa"){renderChat();renderAnexos();}else if(v==="dashboard"){montarFunil(p.id);montarVigia(p.id);}
 }
 
 /* TELA: Dashboard — só números */
@@ -777,7 +777,7 @@ function renderConversa(p,c){
   var acao='<button class="btn sm" onclick="pedirEstrategia()">Estratégia (Opus)</button>';
   var h=pageHead(p.nome,"Conversa com o consultor","",acao);
   h+='<p class="convnote">Sou o consultor do '+esc(p.nome)+'. Tenho acesso ao CRM, a todas as reuniões já feitas e muita expertise em vendas — e sou eu quem alimenta o resto do portal. Pergunte, discuta estratégia, peça um gráfico ou uma ação no CRM, diga por que uma ação não vale ou me ensine uma regra de negócio.</p>';
-  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/*,application/pdf,image/*" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo ou imagem (ou cole com Ctrl+V)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'… (pode colar imagem com Ctrl+V)" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
+  h+='<section class="chat"><div id="chatmsgs" class="chatmsgs"></div><div id="anexochip" class="anexochip"></div><div class="chatinput"><input type="file" id="chatfile" multiple style="display:none" accept=".txt,.md,.csv,.vtt,.srt,.json,.log,.pdf,.png,.jpg,.jpeg,.webp,.gif,text/*,application/pdf,image/*" onchange="anexarArquivo(this)"><button class="clip" type="button" title="Anexar arquivo ou imagem (ou cole com Ctrl+V)" onclick="el(\'chatfile\').click()">📎</button><textarea id="chatin" placeholder="Fale com o consultor do '+esc(p.nome)+'… (pode colar imagem com Ctrl+V)" onkeydown="if(event.key===\'Enter\'&&(event.ctrlKey||event.metaKey))enviar();"></textarea><button class="btn" id="enviarbtn" onclick="enviar()">Enviar</button></div></section>';
   return h;
 }
 
@@ -838,36 +838,37 @@ function renderDemandas(p,c){
 /* chat */
 function renderChat(){var c=CACHE[ESTADO.pid]||{};var msgs=c.conversa||[];var box=el("chatmsgs");if(!box)return;
   if(!msgs.length){box.innerHTML='<div class="chatempty">Converse com o consultor do '+esc(proj().nome)+'. Ele conhece os números e as regras deste projeto.<div class="sugs">'+SUGESTOES.map(function(s){return '<button class="sug" onclick="usarSugestao(this)">'+esc(s)+'</button>';}).join('')+'</div></div>';}
-  else{var h='';msgs.forEach(function(m){var inner;if(m.papel==="assistant"){inner=mdRender(m.conteudo);}else{inner=(m.img?'<img src="'+m.img+'" style="max-width:220px;max-height:220px;border-radius:8px;display:block;margin-bottom:6px">':'')+(m.arq?'<div class="src" style="margin-bottom:4px">📎 '+esc(m.arq)+'</div>':'')+esc(m.conteudo);}h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+inner+'</div>';});box.innerHTML=h;}
+  else{var h='';msgs.forEach(function(m){var inner;if(m.papel==="assistant"){inner=mdRender(m.conteudo);}else{var ig=(m.imgs&&m.imgs.length)?m.imgs.map(function(t){return '<img src="'+t+'" style="max-width:200px;max-height:200px;border-radius:8px;display:inline-block;margin:0 6px 6px 0">';}).join(''):(m.img?'<img src="'+m.img+'" style="max-width:200px;max-height:200px;border-radius:8px;display:block;margin-bottom:6px">':'');inner=(ig?ig+'<br>':'')+(m.arq?'<div class="src" style="margin-bottom:4px">📎 '+esc(m.arq)+'</div>':'')+esc(m.conteudo);}h+='<div class="msg '+(m.papel==="assistant"?"ia":"eu")+'">'+inner+'</div>';});box.innerHTML=h;}
   box.scrollTop=box.scrollHeight;}
-var ANEXO=null;
-function removerAnexo(){ANEXO=null;var chip=el("anexochip");if(chip)chip.innerHTML="";}
-function chipErro(t){var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx err">'+esc(t)+'<span class="del" onclick="removerAnexo()">✕</span></span>';}
+var ANEXOS=[];
+function removerAnexo(i){if(i==null)ANEXOS=[];else ANEXOS.splice(i,1);renderAnexos();}
+function renderAnexos(){var chip=el("anexochip");if(!chip)return;if(!ANEXOS.length){chip.innerHTML="";return;}var h='';ANEXOS.forEach(function(a,i){if(a.kind==="imagem")h+='<span class="anx"><img src="'+a.thumb+'" style="height:34px;width:auto;border-radius:4px">img '+(i+1)+'<span class="del" onclick="removerAnexo('+i+')">✕</span></span>';else h+='<span class="anx">📎 '+esc(a.nome)+'<span class="del" onclick="removerAnexo('+i+')">✕</span></span>';});chip.innerHTML=h;}
+function chipMsg(t,err){var chip=el("anexochip");if(!chip)return;renderAnexos();chip.insertAdjacentHTML("beforeend",'<span class="anx'+(err?" err":"")+'">'+esc(t)+'</span>');}
 function carregarPdfJs(){return new Promise(function(res,rej){if(window.pdfjsLib){res();return;}var s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";s.onload=function(){try{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}catch(e){}res();};s.onerror=function(){rej(new Error("não consegui carregar o leitor de PDF"));};document.head.appendChild(s);});}
 async function lerPdf(f){await carregarPdfJs();var buf=await f.arrayBuffer();var pdf=await window.pdfjsLib.getDocument({data:buf}).promise;var out="";for(var i=1;i<=pdf.numPages;i++){var pg=await pdf.getPage(i);var tc=await pg.getTextContent();out+=tc.items.map(function(it){return it.str;}).join(" ")+"\n";if(out.length>16000)break;}return out;}
 function lerArquivoTexto(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result||""));};r.onerror=function(){rej(new Error("erro de leitura"));};r.readAsText(f);});}
 function lerImagem(f){return new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){var im=new Image();im.onload=function(){var mx=1568,w=im.width,hh=im.height;if(w>mx||hh>mx){var k=Math.min(mx/w,mx/hh);w=Math.round(w*k);hh=Math.round(hh*k);}var cv=document.createElement("canvas");cv.width=w;cv.height=hh;cv.getContext("2d").drawImage(im,0,0,w,hh);var durl=cv.toDataURL("image/jpeg",0.85);res({media_type:"image/jpeg",data:durl.split(",")[1],thumb:durl});};im.onerror=function(){rej(new Error("imagem inválida"));};im.src=String(fr.result||"");};fr.onerror=function(){rej(new Error("erro de leitura"));};fr.readAsDataURL(f);});}
-async function processarImagem(f){var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Processando imagem…</span>';try{var im=await lerImagem(f);ANEXO={kind:"imagem",media_type:im.media_type,data:im.data,thumb:im.thumb};if(chip)chip.innerHTML='<span class="anx"><img src="'+im.thumb+'" style="height:34px;width:auto;border-radius:4px">imagem pronta — escreva e envie<span class="del" onclick="removerAnexo()">✕</span></span>';}catch(e){chipErro("Falha na imagem: "+String(e&&e.message||e));}}
-async function anexarArquivo(inp){var f=inp.files&&inp.files[0];inp.value="";if(!f)return;if((f.type||"").indexOf("image/")===0)return processarImagem(f);var chip=el("anexochip");if(chip)chip.innerHTML='<span class="anx">Lendo '+esc(f.name)+'…</span>';
+async function processarImagem(f){if(ANEXOS.filter(function(a){return a.kind==="imagem";}).length>=8){chipMsg("Máximo de 8 imagens por mensagem.",true);return;}try{var im=await lerImagem(f);ANEXOS.push({kind:"imagem",media_type:im.media_type,data:im.data,thumb:im.thumb});renderAnexos();}catch(e){chipMsg("Falha na imagem: "+String(e&&e.message||e),true);}}
+async function anexarArquivo(inp){var fs=inp.files?Array.prototype.slice.call(inp.files):[];inp.value="";for(var i=0;i<fs.length;i++){var f=fs[i];
+  if((f.type||"").indexOf("image/")===0){await processarImagem(f);continue;}
   try{var nome=(f.name||"").toLowerCase();var txt=(((nome.endsWith(".pdf")||f.type==="application/pdf")?await lerPdf(f):await lerArquivoTexto(f))||"").trim();
-    if(txt.length<2){chipErro("Não achei texto em "+f.name+". Se for PDF escaneado, cole como imagem (Ctrl+V) ou cole o texto.");return;}
-    var cortado=txt.length>14000;if(cortado)txt=txt.slice(0,14000);
-    ANEXO={kind:"texto",nome:f.name,texto:txt};
-    if(chip)chip.innerHTML='<span class="anx">📎 '+esc(f.name)+' · '+txt.length+' caracteres'+(cortado?' (cortado)':'')+'<span class="del" onclick="removerAnexo()">✕</span></span>';
-  }catch(e){chipErro("Falha ao ler: "+String(e&&e.message||e));}}
-function colarImagem(e){var cd=e.clipboardData||window.clipboardData;if(!cd)return;var items=cd.items||[];for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image/")===0){var f=items[i].getAsFile();if(f){e.preventDefault();processarImagem(f);return;}}}var files=cd.files||[];for(var k=0;k<files.length;k++){if((files[k].type||"").indexOf("image/")===0){e.preventDefault();processarImagem(files[k]);return;}}}
+    if(txt.length<2){chipMsg("Não achei texto em "+f.name+". Se for PDF escaneado, cole como imagem.",true);continue;}
+    if(txt.length>14000)txt=txt.slice(0,14000);
+    ANEXOS=ANEXOS.filter(function(a){return a.kind!=="texto";});ANEXOS.push({kind:"texto",nome:f.name,texto:txt});renderAnexos();
+  }catch(e){chipMsg("Falha ao ler: "+String(e&&e.message||e),true);}}}
+function colarImagem(e){var cd=e.clipboardData||window.clipboardData;if(!cd)return;var achou=false;var items=cd.items||[];for(var i=0;i<items.length;i++){if(items[i].type&&items[i].type.indexOf("image/")===0){var f=items[i].getAsFile();if(f){achou=true;processarImagem(f);}}}if(!achou){var files=cd.files||[];for(var k=0;k<files.length;k++){if((files[k].type||"").indexOf("image/")===0){achou=true;processarImagem(files[k]);}}}if(achou)e.preventDefault();}
 if(!window.__pasteBound){window.__pasteBound=true;document.addEventListener("paste",function(e){try{if(ESTADO&&ESTADO.view!=="geral"&&ESTADO.pjview==="conversa"&&el("chatin"))colarImagem(e);}catch(_){}});}
-async function enviar(){var inp=el("chatin");var txt=inp.value.trim();if(!txt&&!ANEXO)return;
+async function enviar(){var inp=el("chatin");var txt=inp.value.trim();var imgs=ANEXOS.filter(function(a){return a.kind==="imagem";});var txtAnx=ANEXOS.filter(function(a){return a.kind==="texto";})[0];if(!txt&&!imgs.length&&!txtAnx)return;
   var pid=ESTADO.pid,c=CACHE[pid]||(CACHE[pid]={});if(!c.conversa)c.conversa=[];
-  var anx=ANEXO,ehImg=anx&&anx.kind==="imagem";
   var histTxt=(c.conversa||[]).slice(-6).map(function(m){return (m.papel==="assistant"?"Consultor":"Você")+": "+String(m.conteudo||"").replace(/\n+/g," ").slice(0,400);}).join("\n");
-  c.conversa.push({papel:"user",conteudo:(txt||(ehImg?"(imagem)":"Leia o arquivo anexado.")),img:(ehImg?anx.thumb:null),arq:(anx&&anx.kind==="texto"?anx.nome:null)});
-  inp.value="";removerAnexo();renderChat();
+  c.conversa.push({papel:"user",conteudo:(txt||(imgs.length?"(imagem)":"Leia o arquivo anexado.")),imgs:imgs.map(function(a){return a.thumb;}),arq:(txtAnx?txtAnx.nome:null)});
+  ANEXOS=[];renderAnexos();inp.value="";renderChat();
   var btn=el("enviarbtn");btn.disabled=true;btn.textContent="…";
   var slug=proj().slug;
   try{var r;
-    if(ehImg){r=await sb.functions.invoke("ver-imagem",{body:{projeto:slug,mensagem:txt,contexto:histTxt,imagem:{media_type:anx.media_type,data:anx.data}}});}
-    else{var mensagem=anx?('Documento anexado pelo usuário — "'+anx.nome+'":\n"""\n'+anx.texto+'\n"""\n\n'+(txt||"Leia este documento e me diga o que é importante para a consultoria deste cliente.")):txt;r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:mensagem}});}
+    if(imgs.length){var m2=txt;if(txtAnx)m2=(txt?txt+"\n\n":"")+'Documento anexado — "'+txtAnx.nome+'":\n'+txtAnx.texto;r=await sb.functions.invoke("ver-imagem",{body:{projeto:slug,mensagem:m2,contexto:histTxt,imagens:imgs.map(function(a){return {media_type:a.media_type,data:a.data};})}});}
+    else if(txtAnx){var mensagem='Documento anexado pelo usuário — "'+txtAnx.nome+'":\n"""\n'+txtAnx.texto+'\n"""\n\n'+(txt||"Leia este documento e me diga o que é importante para a consultoria deste cliente.");r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:mensagem}});}
+    else{r=await sb.functions.invoke("conversa-consultor",{body:{projeto:slug,mensagem:txt}});}
     var err=(r.data&&r.data.error)||(r.error&&r.error.message);
     c.conversa.push({papel:"assistant",conteudo:(err||!r.data||!r.data.resposta)?("(erro: "+(err||"não respondeu")+")"):r.data.resposta});
   }catch(e){c.conversa.push({papel:"assistant",conteudo:"(falha: "+String(e&&e.message||e)+")"});}
@@ -978,7 +979,7 @@ function mostrarDoc(md){el("docovbody").innerHTML=mdRender(md);el("docov").style
 async function gerarDoc(btn){var slug=btn.dataset.slug,fn=btn.dataset.fn,t0=btn.textContent;btn.disabled=true;btn.textContent="Gerando (~30s)…";try{var r=await sb.functions.invoke(fn,{body:{projeto:slug}});var err=(r.data&&r.data.error)||(r.error&&r.error.message);if(err||!r.data||!r.data.documento){alert("Não consegui gerar: "+(err||"erro"));}else{mostrarDoc(r.data.documento.conteudo);delete CACHE[ESTADO.pid];await carregarProjeto(ESTADO.pid);render();}}catch(e){alert("Falha: "+String(e&&e.message||e));}btn.disabled=false;btn.textContent=t0;}
 async function verDoc(span){var r=await sb.from("documentos").select("conteudo").eq("id",span.dataset.id).single();if(r.error){alert("Erro: "+r.error.message);return;}mostrarDoc(r.data.conteudo);}
 
-sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_IN")boot();});
+sb.auth.onAuthStateChange(function(e){if(e==="SIGNED_IN"&&!window.__booted)boot();});
 boot();
 </script>
 </body>
